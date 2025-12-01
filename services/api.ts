@@ -20,9 +20,15 @@ const getBaseUrl = () => {
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location) {
       const { protocol, hostname } = window.location;
-      if ((hostname.includes('replit') || hostname.includes('riker')) && hostname.includes('-00-')) {
-        const backendHost = hostname.replace('-00-', '-01-');
-        return `${protocol}//${backendHost}`;
+      
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:8082';
+      }
+      
+      if (hostname.includes('replit') || hostname.includes('riker')) {
+        const url = `${protocol}//${hostname}:3000`;
+        console.log('Backend URL:', url);
+        return url;
       }
     }
     return 'http://localhost:8082';
@@ -30,8 +36,8 @@ const getBaseUrl = () => {
   const hostUri = Constants.expoConfig?.hostUri;
   if (hostUri) {
     const host = hostUri.split(':')[0];
-    if (host.includes('-00-')) {
-      return `https://${host.replace('-00-', '-01-')}`;
+    if (host.includes('replit') || host.includes('riker')) {
+      return `https://${host}:3000`;
     }
     return `http://${host}:8082`;
   }
