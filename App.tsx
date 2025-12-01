@@ -6,23 +6,29 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
-import MainTabNavigator from "@/navigation/MainTabNavigator";
+import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RadioModeProvider } from "@/context/RadioModeContext";
+import { PhoneProvider } from "@/context/PhoneContext";
 
 export default function App() {
   return (
-  <ErrorBoundary>
-    <SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
         <GestureHandlerRootView style={styles.root}>
           <KeyboardProvider>
-            <NavigationContainer>
-              <MainTabNavigator />
-            </NavigationContainer>
+            <RadioModeProvider>
+              <PhoneProvider>
+                <NavigationContainer>
+                  <RootStackNavigator />
+                </NavigationContainer>
+              </PhoneProvider>
+            </RadioModeProvider>
             <StatusBar style="auto" />
           </KeyboardProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>
-  </ErrorBoundary>
+    </ErrorBoundary>
   );
 }
 
