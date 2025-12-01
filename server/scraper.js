@@ -211,18 +211,14 @@ async function scrapeWillhaben() {
   const url = 'https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse';
   
   try {
-    console.log('Fetching Willhaben...');
     const html = await fetchPage(url);
-    console.log(`Received ${html.length} bytes`);
     
     let vehicles = parseVehiclesFromJSON(html);
     
     if (vehicles.length === 0) {
-      console.log('Trying HTML parsing...');
       vehicles = parseVehiclesFromHTML(html);
     }
     
-    console.log(`Parsed ${vehicles.length} vehicles`);
     return vehicles;
   } catch (error) {
     console.error('Scraping error:', error.message);

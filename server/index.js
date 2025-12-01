@@ -15,9 +15,7 @@ let isFirstScrape = true;
 
 async function scrapeAndStore() {
   try {
-    console.log('Starting scrape...');
     const scrapedVehicles = await scraper.scrapeWillhaben();
-    console.log(`Scraped ${scrapedVehicles.length} vehicles`);
 
     let newCount = 0;
     
@@ -38,7 +36,9 @@ async function scrapeAndStore() {
     lastScrapeTime = new Date().toISOString();
     isFirstScrape = false;
     
-    console.log(`Cache size: ${vehicleCache.size}, New this scrape: ${newCount}`);
+    if (newCount > 0) {
+      console.log(`[Willhaben] ${newCount} novih vozila pronađeno`);
+    }
     return newCount;
   } catch (error) {
     console.error('Scrape error:', error.message);
@@ -93,15 +93,12 @@ app.get('/api/health', (req, res) => {
 });
 
 async function startServer() {
-  console.log('Starting Willhaben scraper (no database)...');
-  
   await scrapeAndStore();
   
   setInterval(scrapeAndStore, 30000);
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Scraping every 30 seconds...`);
+    console.log(`[Backend] API running on port ${PORT}`);
   });
 }
 
