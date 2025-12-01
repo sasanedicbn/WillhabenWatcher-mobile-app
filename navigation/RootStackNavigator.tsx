@@ -13,7 +13,7 @@ import { getCommonScreenOptions } from "@/navigation/screenOptions";
 import { useRadioMode } from "@/context/RadioModeContext";
 import { usePhone } from "@/context/PhoneContext";
 import { Spacing, Colors } from "@/constants/theme";
-import { Vehicle } from "@/data/mockVehicles";
+import { Vehicle } from "@/services/api";
 
 export type RootStackParamList = {
   Home: undefined;

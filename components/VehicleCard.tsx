@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   StyleSheet,
@@ -20,11 +20,12 @@ import Animated, {
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
-import { Vehicle } from "@/data/mockVehicles";
+import { Vehicle } from "@/services/api";
 
 interface VehicleCardProps {
   vehicle: Vehicle;
   onCardPress: () => void;
+  isNew?: boolean;
 }
 
 const springConfig: WithSpringConfig = {
@@ -37,7 +38,7 @@ const springConfig: WithSpringConfig = {
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-export function VehicleCard({ vehicle, onCardPress }: VehicleCardProps) {
+export function VehicleCard({ vehicle, onCardPress, isNew }: VehicleCardProps) {
   const { isDark } = useTheme();
   const scale = useSharedValue(1);
   const colors = isDark ? Colors.dark : Colors.light;
@@ -68,35 +69,28 @@ export function VehicleCard({ vehicle, onCardPress }: VehicleCardProps) {
   };
 
   const handleChatPress = async () => {
-    const willhabenDeepLink = `willhaben://ad/${vehicle.id}/chat`;
-    const willhabenWebUrl = `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicle.id}`;
+    const vehicleId = vehicle.id.replace('wh-', '');
+    const willhabenUrl = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicleId}`;
 
     try {
-      const canOpen = await Linking.canOpenURL(willhabenDeepLink);
-      if (canOpen) {
-        await Linking.openURL(willhabenDeepLink);
-      } else {
-        await WebBrowser.openBrowserAsync(willhabenWebUrl);
-      }
-    } catch (error) {
-      try {
-        await WebBrowser.openBrowserAsync(willhabenWebUrl);
-      } catch {
-        Alert.alert("Error", "Could not open Willhaben");
-      }
+      await WebBrowser.openBrowserAsync(willhabenUrl);
+    } catch {
+      Alert.alert("Error", "Could not open Willhaben");
     }
   };
 
   const handleMessagePress = async () => {
-    const willhabenWebUrl = `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicle.id}`;
+    const vehicleId = vehicle.id.replace('wh-', '');
+    const willhabenUrl = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicleId}`;
     try {
-      await WebBrowser.openBrowserAsync(willhabenWebUrl);
+      await WebBrowser.openBrowserAsync(willhabenUrl);
     } catch {
       Alert.alert("Error", "Could not open browser");
     }
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number | null) => {
+    if (!price) return "Preis auf Anfrage";
     return new Intl.NumberFormat("de-AT", {
       style: "currency",
       currency: "EUR",
@@ -104,9 +98,20 @@ export function VehicleCard({ vehicle, onCardPress }: VehicleCardProps) {
     }).format(price);
   };
 
-  const formatMileage = (mileage: number) => {
+  const formatMileage = (mileage: number | null) => {
+    if (!mileage) return "";
     return new Intl.NumberFormat("de-AT").format(mileage) + " km";
   };
+
+  const getMetadata = () => {
+    const parts = [];
+    if (vehicle.year) parts.push(vehicle.year.toString());
+    if (vehicle.mileage) parts.push(formatMileage(vehicle.mileage));
+    if (vehicle.fuelType) parts.push(vehicle.fuelType);
+    return parts.join(" • ") || vehicle.location;
+  };
+
+  const placeholderImage = "https://via.placeholder.com/200x200.png?text=Auto";
 
   return (
     <AnimatedView
@@ -114,11 +119,12 @@ export function VehicleCard({ vehicle, onCardPress }: VehicleCardProps) {
         styles.card,
         {
           backgroundColor: colors.backgroundDefault,
-          borderColor: colors.border,
+          borderColor: isNew ? colors.primary : colors.border,
+          borderWidth: isNew ? 2 : 1,
         },
         animatedStyle,
       ]}
-      accessibilityLabel={`${vehicle.title}, ${vehicle.year}, ${formatMileage(vehicle.mileage)}, ${formatPrice(vehicle.price)}`}
+      accessibilityLabel={`${vehicle.title}, ${vehicle.year || 'Jahr unbekannt'}, ${formatPrice(vehicle.price)}`}
     >
       <TouchableOpacity
         onPress={handleImagePress}
@@ -128,11 +134,16 @@ export function VehicleCard({ vehicle, onCardPress }: VehicleCardProps) {
         style={styles.imageContainer}
       >
         <Image
-          source={{ uri: vehicle.imageUrl }}
+          source={{ uri: vehicle.imageUrl || placeholderImage }}
           style={styles.image}
           contentFit="cover"
           transition={200}
         />
+        {isNew ? (
+          <View style={[styles.newBadge, { backgroundColor: colors.primary }]}>
+            <ThemedText style={styles.newBadgeText}>NEU</ThemedText>
+          </View>
+        ) : null}
       </TouchableOpacity>
 
       <View style={styles.contentContainer}>
@@ -151,7 +162,7 @@ export function VehicleCard({ vehicle, onCardPress }: VehicleCardProps) {
           </ThemedText>
 
           <ThemedText style={[styles.metadata, { color: colors.textSecondary }]}>
-            {vehicle.year} • {formatMileage(vehicle.mileage)}
+            {getMetadata()}
           </ThemedText>
 
           <ThemedText style={[styles.price, { color: colors.primary }]}>
@@ -165,7 +176,7 @@ export function VehicleCard({ vehicle, onCardPress }: VehicleCardProps) {
             activeOpacity={0.6}
             style={[styles.iconButton, { backgroundColor: colors.backgroundSecondary }]}
           >
-            <Feather name="mail" size={18} color={colors.textSecondary} />
+            <Feather name="external-link" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -186,7 +197,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
-    borderWidth: 1,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -204,10 +214,24 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: BorderRadius.sm,
     overflow: "hidden",
+    position: "relative",
   },
   image: {
     width: "100%",
     height: "100%",
+  },
+  newBadge: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  newBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
   },
   contentContainer: {
     flex: 1,

@@ -1,58 +1,84 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { StyleSheet, RefreshControl, ActivityIndicator, View } from "react-native";
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { StyleSheet, RefreshControl, ActivityIndicator, View, AppState } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { VehicleCard } from "@/components/VehicleCard";
 import { ScreenFlatList } from "@/components/ScreenFlatList";
-import { SearchFilterBar, FilterOptions } from "@/components/SearchFilterBar";
 import { ThemedText } from "@/components/ThemedText";
 import Spacer from "@/components/Spacer";
 import { Spacing, Colors } from "@/constants/theme";
 import { useTheme } from "@/hooks/useTheme";
 import { usePhone } from "@/context/PhoneContext";
-import { Vehicle, getSortedVehicles } from "@/data/mockVehicles";
+import { useNewCarSound } from "@/hooks/useNewCarSound";
+import { fetchVehicles, markVehiclesAsSeen, Vehicle } from "@/services/api";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type HomeScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Home">;
 };
 
-const defaultFilters: FilterOptions = {
-  minPrice: "",
-  maxPrice: "",
-  minYear: "",
-  maxYear: "",
-  fuelType: "Alle",
-  bodyType: "Alle",
-  location: "Alle",
-};
+const POLL_INTERVAL = 10000;
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
+  const { playNewCarSound } = useNewCarSound();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState<FilterOptions>(defaultFilters);
+  const [lastScrapeTime, setLastScrapeTime] = useState<string | null>(null);
+  const [newCarCount, setNewCarCount] = useState(0);
+  const previousVehicleIds = useRef<Set<string>>(new Set());
   const colors = isDark ? Colors.dark : Colors.light;
 
-  const fetchVehicles = useCallback(async () => {
+  const loadVehicles = useCallback(async (isRefresh = false) => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const data = getSortedVehicles();
-      setVehicles(data);
+      const data = await fetchVehicles();
+      
+      if (data.vehicles.length > 0) {
+        const newIds = new Set(data.vehicles.map(v => v.id));
+        const actuallyNew = data.vehicles.filter(v => !previousVehicleIds.current.has(v.id));
+        
+        if (previousVehicleIds.current.size > 0 && actuallyNew.length > 0) {
+          console.log(`Found ${actuallyNew.length} new vehicles!`);
+          setNewCarCount(prev => prev + actuallyNew.length);
+          playNewCarSound();
+        }
+        
+        previousVehicleIds.current = newIds;
+      }
+      
+      setVehicles(data.vehicles);
+      setLastScrapeTime(data.lastScrapeTime);
     } catch (error) {
       console.error("Error fetching vehicles:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+  }, [playNewCarSound]);
+
+  useEffect(() => {
+    loadVehicles();
   }, []);
 
   useEffect(() => {
-    fetchVehicles();
-  }, [fetchVehicles]);
+    const interval = setInterval(() => {
+      loadVehicles();
+    }, POLL_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [loadVehicles]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        loadVehicles();
+      }
+    });
+
+    return () => subscription?.remove();
+  }, [loadVehicles]);
 
   useEffect(() => {
     if (vehicles.length > 0 && vehicles[0].phone) {
@@ -60,91 +86,56 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     }
   }, [vehicles, setCurrentPhone]);
 
-  const filteredVehicles = useMemo(() => {
-    return vehicles.filter((vehicle) => {
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const matchesSearch =
-          vehicle.title.toLowerCase().includes(query) ||
-          vehicle.location.toLowerCase().includes(query) ||
-          vehicle.fuelType.toLowerCase().includes(query) ||
-          vehicle.bodyType.toLowerCase().includes(query) ||
-          vehicle.color.toLowerCase().includes(query);
-        if (!matchesSearch) return false;
-      }
-
-      if (filters.minPrice) {
-        const minPrice = parseInt(filters.minPrice, 10);
-        if (!isNaN(minPrice) && vehicle.price < minPrice) return false;
-      }
-
-      if (filters.maxPrice) {
-        const maxPrice = parseInt(filters.maxPrice, 10);
-        if (!isNaN(maxPrice) && vehicle.price > maxPrice) return false;
-      }
-
-      if (filters.minYear) {
-        const minYear = parseInt(filters.minYear, 10);
-        if (!isNaN(minYear) && vehicle.year < minYear) return false;
-      }
-
-      if (filters.maxYear) {
-        const maxYear = parseInt(filters.maxYear, 10);
-        if (!isNaN(maxYear) && vehicle.year > maxYear) return false;
-      }
-
-      if (filters.fuelType !== "Alle" && vehicle.fuelType !== filters.fuelType) {
-        return false;
-      }
-
-      if (filters.bodyType !== "Alle" && vehicle.bodyType !== filters.bodyType) {
-        return false;
-      }
-
-      if (filters.location !== "Alle" && vehicle.location !== filters.location) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [vehicles, searchQuery, filters]);
-
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchVehicles();
-  }, [fetchVehicles]);
+    loadVehicles(true);
+  }, [loadVehicles]);
 
   const handleCardPress = (vehicle: Vehicle) => {
     setCurrentPhone(vehicle.phone || null);
     navigation.navigate("Details", { vehicle });
   };
 
-  const handleClearFilters = () => {
-    setFilters(defaultFilters);
-    setSearchQuery("");
+  const handleClearNewCount = async () => {
+    setNewCarCount(0);
+    await markVehiclesAsSeen();
   };
 
   const renderItem = ({ item, index }: { item: Vehicle; index: number }) => (
     <>
-      <VehicleCard vehicle={item} onCardPress={() => handleCardPress(item)} />
-      {index < filteredVehicles.length - 1 ? <Spacer height={Spacing.md} /> : null}
+      <VehicleCard 
+        vehicle={item} 
+        onCardPress={() => handleCardPress(item)}
+        isNew={item.isNew} 
+      />
+      {index < vehicles.length - 1 ? <Spacer height={Spacing.md} /> : null}
     </>
   );
 
   const renderHeader = () => (
-    <SearchFilterBar
-      searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
-      filters={filters}
-      onFiltersChange={setFilters}
-      onClearFilters={handleClearFilters}
-    />
+    <View style={styles.headerContainer}>
+      {newCarCount > 0 ? (
+        <View style={[styles.newCarBanner, { backgroundColor: colors.primary }]}>
+          <ThemedText style={styles.newCarText}>
+            {newCarCount} neue Fahrzeuge gefunden!
+          </ThemedText>
+        </View>
+      ) : null}
+      {lastScrapeTime ? (
+        <ThemedText style={[styles.lastUpdate, { color: colors.textSecondary }]}>
+          Letzte Aktualisierung: {new Date(lastScrapeTime).toLocaleTimeString('de-AT')}
+        </ThemedText>
+      ) : null}
+    </View>
   );
 
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.backgroundRoot }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+        <ThemedText style={[styles.loadingText, { color: colors.textSecondary }]}>
+          Lade Fahrzeuge von Willhaben...
+        </ThemedText>
       </View>
     );
   }
@@ -152,27 +143,20 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   if (vehicles.length === 0) {
     return (
       <View style={[styles.emptyContainer, { backgroundColor: colors.backgroundRoot }]}>
-        <ThemedText style={styles.emptyText}>No vehicles available</ThemedText>
+        <ThemedText style={styles.emptyText}>Keine Fahrzeuge verfügbar</ThemedText>
+        <ThemedText style={[styles.emptyHint, { color: colors.textSecondary }]}>
+          Willhaben wird alle 30 Sekunden gescannt
+        </ThemedText>
       </View>
     );
   }
 
   return (
     <ScreenFlatList
-      data={filteredVehicles}
+      data={vehicles}
       renderItem={renderItem}
       keyExtractor={(item) => item.id}
       ListHeaderComponent={renderHeader}
-      ListEmptyComponent={
-        <View style={styles.noResultsContainer}>
-          <ThemedText style={[styles.noResultsText, { color: colors.textSecondary }]}>
-            Keine Fahrzeuge gefunden
-          </ThemedText>
-          <ThemedText style={[styles.noResultsHint, { color: colors.textSecondary }]}>
-            Versuchen Sie andere Suchbegriffe oder Filter
-          </ThemedText>
-        </View>
-      }
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -191,6 +175,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    gap: Spacing.md,
+  },
+  loadingText: {
+    fontSize: 14,
+    marginTop: Spacing.sm,
   },
   emptyContainer: {
     flex: 1,
@@ -198,24 +187,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptyText: {
-    fontSize: 16,
-    opacity: 0.6,
-  },
-  noResultsContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: Spacing.xxl,
-    paddingHorizontal: Spacing.lg,
-  },
-  noResultsText: {
     fontSize: 18,
+    fontWeight: "600",
+  },
+  emptyHint: {
+    fontSize: 14,
+    marginTop: Spacing.sm,
+  },
+  headerContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+  },
+  newCarBanner: {
+    padding: Spacing.md,
+    borderRadius: 8,
+    marginBottom: Spacing.sm,
+  },
+  newCarText: {
+    color: "#FFFFFF",
     fontWeight: "600",
     textAlign: "center",
   },
-  noResultsHint: {
-    fontSize: 14,
+  lastUpdate: {
+    fontSize: 12,
     textAlign: "center",
-    marginTop: Spacing.sm,
   },
 });

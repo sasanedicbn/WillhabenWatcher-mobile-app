@@ -3,31 +3,33 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  FlatList,
-  Platform,
+  TouchableOpacity,
+  Alert,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
 
 import { ThemedText } from "@/components/ThemedText";
-import { SimilarVehicleCard } from "@/components/SimilarVehicleCard";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { useTheme } from "@/hooks/useTheme";
 import { usePhone } from "@/context/PhoneContext";
-import { getSimilarVehicles, Vehicle } from "@/data/mockVehicles";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type DetailsScreenProps = NativeStackScreenProps<RootStackParamList, "Details">;
 
 interface SpecRowProps {
   label: string;
-  value: string;
+  value: string | null | undefined;
 }
 
 function SpecRow({ label, value }: SpecRowProps) {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+
+  if (!value) return null;
 
   return (
     <View style={styles.specRow}>
@@ -48,13 +50,12 @@ export default function DetailsScreen({ route }: DetailsScreenProps) {
   const insets = useSafeAreaInsets();
   const colors = isDark ? Colors.dark : Colors.light;
 
-  const similarVehicles = getSimilarVehicles(vehicle.id);
-
   useEffect(() => {
     setCurrentPhone(vehicle.phone || null);
   }, [vehicle.phone, setCurrentPhone]);
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number | null) => {
+    if (!price) return "Preis auf Anfrage";
     return new Intl.NumberFormat("de-AT", {
       style: "currency",
       currency: "EUR",
@@ -62,24 +63,22 @@ export default function DetailsScreen({ route }: DetailsScreenProps) {
     }).format(price);
   };
 
-  const formatMileage = (mileage: number) => {
+  const formatMileage = (mileage: number | null) => {
+    if (!mileage) return null;
     return new Intl.NumberFormat("de-AT").format(mileage) + " km";
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("de-AT", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+  const handleOpenWillhaben = async () => {
+    const vehicleId = vehicle.id.replace('wh-', '');
+    const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicleId}`;
+    try {
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      Alert.alert("Error", "Could not open Willhaben");
+    }
   };
 
-  const renderSimilarItem = ({ item }: { item: Vehicle }) => (
-    <View style={styles.similarItemWrapper}>
-      <SimilarVehicleCard vehicle={item} />
-    </View>
-  );
+  const placeholderImage = "https://via.placeholder.com/400x250.png?text=Auto";
 
   return (
     <ScrollView
@@ -91,7 +90,7 @@ export default function DetailsScreen({ route }: DetailsScreenProps) {
       showsVerticalScrollIndicator={false}
     >
       <Image
-        source={{ uri: vehicle.imageUrl }}
+        source={{ uri: vehicle.imageUrl || placeholderImage }}
         style={styles.heroImage}
         contentFit="cover"
         transition={200}
@@ -114,42 +113,24 @@ export default function DetailsScreen({ route }: DetailsScreenProps) {
         </View>
 
         <View style={styles.specsContainer}>
-          <SpecRow label="Year" value={vehicle.year.toString()} />
-          <SpecRow label="Mileage" value={formatMileage(vehicle.mileage)} />
-          <SpecRow label="Expiration" value={formatDate(vehicle.expirationDate)} />
-          <SpecRow label="Fuel Type" value={vehicle.fuelType} />
-          <SpecRow label="Transmission" value={vehicle.transmission} />
-          <SpecRow label="Power" value={vehicle.power} />
-          <SpecRow label="Body Type" value={vehicle.bodyType} />
-          <SpecRow label="Color" value={vehicle.color} />
-          <SpecRow label="Doors" value={vehicle.doors.toString()} />
-          <SpecRow label="Seats" value={vehicle.seats.toString()} />
-          <SpecRow label="Previous Owners" value={vehicle.previousOwners.toString()} />
-          <SpecRow label="Location" value={vehicle.location} />
+          <SpecRow label="Jahr" value={vehicle.year?.toString()} />
+          <SpecRow label="Kilometerstand" value={formatMileage(vehicle.mileage)} />
+          <SpecRow label="Kraftstoff" value={vehicle.fuelType} />
+          <SpecRow label="Standort" value={vehicle.location} />
           {vehicle.phone ? (
-            <SpecRow label="Phone" value={vehicle.phone} />
+            <SpecRow label="Telefon" value={vehicle.phone} />
           ) : null}
         </View>
 
-        <ThemedText style={[styles.description, { color: colors.textSecondary }]}>
-          {vehicle.description}
-        </ThemedText>
-
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-        <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-          Similar Vehicles
-        </ThemedText>
-
-        <FlatList
-          data={similarVehicles}
-          renderItem={renderSimilarItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.similarList}
-          scrollEnabled
-        />
+        <TouchableOpacity
+          onPress={handleOpenWillhaben}
+          style={[styles.willhabenButton, { backgroundColor: colors.primary }]}
+        >
+          <Feather name="external-link" size={20} color="#FFFFFF" />
+          <ThemedText style={styles.willhabenButtonText}>
+            Auf Willhaben ansehen
+          </ThemedText>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -202,24 +183,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  description: {
-    marginTop: Spacing.lg,
-    fontSize: 14,
-    lineHeight: 22,
+  willhabenButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    marginTop: Spacing.xl,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
   },
-  divider: {
-    height: 1,
-    marginVertical: Spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 18,
+  willhabenButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
     fontWeight: "600",
-    marginBottom: Spacing.md,
-  },
-  similarList: {
-    paddingRight: Spacing.lg,
-  },
-  similarItemWrapper: {
-    marginRight: Spacing.md,
   },
 });
