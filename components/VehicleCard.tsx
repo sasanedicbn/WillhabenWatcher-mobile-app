@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Image } from "expo-image";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import Animated, {
@@ -176,7 +176,7 @@ export function VehicleCard({ vehicle, onCardPress, isNew }: VehicleCardProps) {
             activeOpacity={0.6}
             style={[styles.iconButton, { backgroundColor: colors.backgroundSecondary }]}
           >
-            <Feather name="external-link" size={18} color={colors.textSecondary} />
+            <Ionicons name="open-outline" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -184,7 +184,7 @@ export function VehicleCard({ vehicle, onCardPress, isNew }: VehicleCardProps) {
             activeOpacity={0.6}
             style={[styles.iconButton, { backgroundColor: colors.backgroundSecondary }]}
           >
-            <Feather name="message-circle" size={18} color={colors.textSecondary} />
+            <Ionicons name="chatbubble-outline" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>

@@ -9,7 +9,7 @@ import {
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -126,7 +126,7 @@ export default function DetailsScreen({ route }: DetailsScreenProps) {
           onPress={handleOpenWillhaben}
           style={[styles.willhabenButton, { backgroundColor: colors.primary }]}
         >
-          <Feather name="external-link" size={20} color="#FFFFFF" />
+          <Ionicons name="open-outline" size={22} color="#FFFFFF" />
           <ThemedText style={styles.willhabenButtonText}>
             Auf Willhaben ansehen
           </ThemedText>

@@ -1,7 +1,7 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Alert, Pressable, Switch, View, StyleSheet } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 
 import HomeScreen from "@/screens/HomeScreen";
@@ -94,9 +94,9 @@ function HeaderRight() {
             : "Enable radio mode and select a vehicle with a phone number to call"
         }
       >
-        <Feather
-          name="headphones"
-          size={22}
+        <Ionicons
+          name="call"
+          size={24}
           color={isRadioModeOn && currentPhone ? colors.primary : theme.textSecondary}
         />
       </Pressable>
