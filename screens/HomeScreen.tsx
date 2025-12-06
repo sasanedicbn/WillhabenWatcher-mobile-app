@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { StyleSheet, RefreshControl, ActivityIndicator, View, AppState } from "react-native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { VehicleCard } from "@/components/VehicleCard";
 import { ScreenFlatList } from "@/components/ScreenFlatList";
@@ -11,15 +10,10 @@ import { useTheme } from "@/hooks/useTheme";
 import { usePhone } from "@/context/PhoneContext";
 import { useNewCarSound } from "@/hooks/useNewCarSound";
 import { fetchVehicles, markVehiclesAsSeen, Vehicle } from "@/services/api";
-import { RootStackParamList } from "@/navigation/RootStackNavigator";
-
-type HomeScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, "Home">;
-};
 
 const POLL_INTERVAL = 10000;
 
-export default function HomeScreen({ navigation }: HomeScreenProps) {
+export default function HomeScreen() {
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const { playNewCarSound } = useNewCarSound();
@@ -91,11 +85,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     loadVehicles(true);
   }, [loadVehicles]);
 
-  const handleCardPress = (vehicle: Vehicle) => {
-    setCurrentPhone(vehicle.phone || null);
-    navigation.navigate("Details", { vehicle });
-  };
-
   const handleClearNewCount = async () => {
     setNewCarCount(0);
     await markVehiclesAsSeen();
@@ -105,7 +94,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     <>
       <VehicleCard 
         vehicle={item} 
-        onCardPress={() => handleCardPress(item)}
         isNew={item.isNew} 
       />
       {index < vehicles.length - 1 ? <Spacer height={Spacing.md} /> : null}

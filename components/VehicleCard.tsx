@@ -19,12 +19,12 @@ import Animated, {
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { usePhone } from "@/context/PhoneContext";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { Vehicle } from "@/services/api";
 
 interface VehicleCardProps {
   vehicle: Vehicle;
-  onCardPress: () => void;
   isNew?: boolean;
 }
 
@@ -38,8 +38,9 @@ const springConfig: WithSpringConfig = {
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-export function VehicleCard({ vehicle, onCardPress, isNew }: VehicleCardProps) {
+export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const { isDark } = useTheme();
+  const { setCurrentPhone } = usePhone();
   const scale = useSharedValue(1);
   const colors = isDark ? Colors.dark : Colors.light;
 
@@ -68,7 +69,8 @@ export function VehicleCard({ vehicle, onCardPress, isNew }: VehicleCardProps) {
     }
   };
 
-  const handleChatPress = async () => {
+  const handleCardPress = async () => {
+    setCurrentPhone(vehicle.phone || null);
     const vehicleId = vehicle.id.replace('wh-', '');
     const willhabenUrl = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicleId}`;
 
@@ -80,6 +82,7 @@ export function VehicleCard({ vehicle, onCardPress, isNew }: VehicleCardProps) {
   };
 
   const handleMessagePress = async () => {
+    setCurrentPhone(vehicle.phone || null);
     const vehicleId = vehicle.id.replace('wh-', '');
     const willhabenUrl = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicleId}`;
     try {
@@ -148,7 +151,7 @@ export function VehicleCard({ vehicle, onCardPress, isNew }: VehicleCardProps) {
 
       <View style={styles.contentContainer}>
         <TouchableOpacity
-          onPress={onCardPress}
+          onPress={handleCardPress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           activeOpacity={0.9}
@@ -180,7 +183,7 @@ export function VehicleCard({ vehicle, onCardPress, isNew }: VehicleCardProps) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={handleChatPress}
+            onPress={handleCardPress}
             activeOpacity={0.6}
             style={[styles.iconButton, { backgroundColor: colors.backgroundSecondary }]}
           >
