@@ -92,6 +92,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Willhaben Cars API',
+    endpoints: ['/api/vehicles', '/api/vehicles/new', '/api/health'],
+    status: 'running'
+  });
+});
+
 async function startServer() {
   await scrapeAndStore();
   
