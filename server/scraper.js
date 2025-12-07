@@ -208,7 +208,7 @@ function parseVehiclesFromJSON(html) {
 }
 
 async function scrapeWillhaben() {
-  const url = 'https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse';
+  const url = 'https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?PRICE_TO=10000&ISPRIVATE=1';
   
   try {
     const html = await fetchPage(url);
@@ -218,6 +218,13 @@ async function scrapeWillhaben() {
     if (vehicles.length === 0) {
       vehicles = parseVehiclesFromHTML(html);
     }
+    
+    vehicles = vehicles.filter(v => {
+      if (v.price !== null && v.price > 10000) {
+        return false;
+      }
+      return true;
+    });
     
     return vehicles;
   } catch (error) {
