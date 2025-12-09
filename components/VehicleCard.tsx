@@ -58,7 +58,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 
   const handleImagePress = async () => {
     const searchQuery = encodeURIComponent(
-      `${vehicle.title} ${vehicle.location} kontakt`
+      `${vehicle.title} ${vehicle.location} telefon kontakt`
     );
     const googleUrl = `https://www.google.com/search?q=${searchQuery}`;
 
@@ -84,7 +84,11 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const handleMessagePress = async () => {
     setCurrentPhone(vehicle.phone || null);
     const vehicleId = vehicle.id.replace('wh-', '');
-    const willhabenUrl = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicleId}`;
+    const messageTemplate = `Hallöchen 🥰🥰🥰 haben Sie kurz Zeit für ein Telefonat? Er gefällt mir und der Preis passt mir auch.
+Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
+06643972640`;
+    const encodedMessage = encodeURIComponent(messageTemplate);
+    const willhabenUrl = `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicleId}?message=${encodedMessage}`;
     try {
       await WebBrowser.openBrowserAsync(willhabenUrl);
     } catch {
@@ -177,9 +181,9 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
           <TouchableOpacity
             onPress={handleMessagePress}
             activeOpacity={0.6}
-            style={[styles.iconButton, { backgroundColor: colors.backgroundSecondary }]}
+            style={[styles.iconButton, { backgroundColor: colors.primary }]}
           >
-            <Ionicons name="open-outline" size={20} color={colors.textSecondary} />
+            <Ionicons name="mail-outline" size={20} color="#FFFFFF" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -187,7 +191,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
             activeOpacity={0.6}
             style={[styles.iconButton, { backgroundColor: colors.backgroundSecondary }]}
           >
-            <Ionicons name="chatbubble-outline" size={20} color={colors.textSecondary} />
+            <Ionicons name="open-outline" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
