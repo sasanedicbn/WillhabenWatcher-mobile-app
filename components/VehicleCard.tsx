@@ -10,6 +10,7 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import * as Clipboard from "expo-clipboard";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -71,11 +72,10 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 
   const handleCardPress = async () => {
     setCurrentPhone(vehicle.phone || null);
-    const vehicleId = vehicle.id.replace('wh-', '');
-    const willhabenUrl = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicleId}`;
+    const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
 
     try {
-      await WebBrowser.openBrowserAsync(willhabenUrl);
+      await WebBrowser.openBrowserAsync(url);
     } catch {
       Alert.alert("Error", "Could not open Willhaben");
     }
@@ -83,16 +83,27 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 
   const handleMessagePress = async () => {
     setCurrentPhone(vehicle.phone || null);
-    const vehicleId = vehicle.id.replace('wh-', '');
     const messageTemplate = `Hallöchen 🥰🥰🥰 haben Sie kurz Zeit für ein Telefonat? Er gefällt mir und der Preis passt mir auch.
 Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
 06643972640`;
-    const encodedMessage = encodeURIComponent(messageTemplate);
-    const willhabenUrl = `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicleId}?message=${encodedMessage}`;
+
     try {
-      await WebBrowser.openBrowserAsync(willhabenUrl);
+      await Clipboard.setStringAsync(messageTemplate);
+      Alert.alert(
+        "Poruka kopirana!",
+        "Poruka je kopirana u clipboard. Sad idi na stranicu i zalijepi je.",
+        [
+          {
+            text: "Otvori Willhaben",
+            onPress: async () => {
+              const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
+              await WebBrowser.openBrowserAsync(url);
+            },
+          },
+        ]
+      );
     } catch {
-      Alert.alert("Error", "Could not open browser");
+      Alert.alert("Error", "Could not copy message");
     }
   };
 
