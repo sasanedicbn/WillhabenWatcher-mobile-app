@@ -181,8 +181,8 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           </View>
         ) : null}
         {hasPhone ? (
-          <View style={[styles.phoneBadge, { backgroundColor: isRadioModeOn ? colors.success : colors.textSecondary }]}>
-            <Ionicons name="call" size={12} color="#FFFFFF" />
+          <View style={[styles.phoneBadge, { backgroundColor: isRadioModeOn ? "#22C55E" : "#6B7280" }]}>
+            <Ionicons name="call" size={16} color="#FFFFFF" />
           </View>
         ) : null}
       </TouchableOpacity>
@@ -195,12 +195,20 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           activeOpacity={0.9}
           style={styles.textContent}
         >
-          <ThemedText
-            style={[styles.title, { color: colors.text }]}
-            numberOfLines={2}
-          >
-            {vehicle.title}
-          </ThemedText>
+          <View style={styles.titleRow}>
+            <ThemedText
+              style={[styles.title, { color: colors.text, flex: 1 }]}
+              numberOfLines={2}
+            >
+              {vehicle.title}
+            </ThemedText>
+            {hasPhone ? (
+              <View style={[styles.phoneTag, { backgroundColor: isRadioModeOn ? "#22C55E" : "#3B82F6" }]}>
+                <Ionicons name="call" size={14} color="#FFFFFF" />
+                <ThemedText style={styles.phoneTagText}>TEL</ThemedText>
+              </View>
+            ) : null}
+          </View>
 
           <ThemedText style={[styles.metadata, { color: colors.textSecondary }]}>
             {getMetadata()}
@@ -278,11 +286,29 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 4,
     right: 4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  phoneTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    gap: 3,
+  },
+  phoneTagText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
   },
   contentContainer: {
     flex: 1,
