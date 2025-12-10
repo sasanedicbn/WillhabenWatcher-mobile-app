@@ -21,6 +21,7 @@ import Animated, {
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { usePhone } from "@/context/PhoneContext";
+import { useRadioMode } from "@/context/RadioModeContext";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { Vehicle } from "@/services/api";
 
@@ -42,8 +43,10 @@ const AnimatedView = Animated.createAnimatedComponent(View);
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
+  const { isRadioModeOn } = useRadioMode();
   const scale = useSharedValue(1);
   const colors = isDark ? Colors.dark : Colors.light;
+  const hasPhone = Boolean(vehicle.phone);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -72,8 +75,23 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 
   const handleCardPress = async () => {
     setCurrentPhone(vehicle.phone || null);
-    const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
 
+    if (isRadioModeOn && hasPhone && vehicle.phone) {
+      try {
+        const phoneUrl = `tel:${vehicle.phone}`;
+        const supported = await Linking.canOpenURL(phoneUrl);
+        if (supported) {
+          await Linking.openURL(phoneUrl);
+        } else {
+          Alert.alert("Greška", "Pozivi nisu podržani na ovom uređaju");
+        }
+      } catch {
+        Alert.alert("Greška", "Nije moguće pokrenuti poziv");
+      }
+      return;
+    }
+
+    const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
     try {
       await WebBrowser.openBrowserAsync(url);
     } catch {
@@ -160,6 +178,11 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
         {isNew ? (
           <View style={[styles.newBadge, { backgroundColor: colors.primary }]}>
             <ThemedText style={styles.newBadgeText}>NEU</ThemedText>
+          </View>
+        ) : null}
+        {hasPhone ? (
+          <View style={[styles.phoneBadge, { backgroundColor: isRadioModeOn ? colors.success : colors.textSecondary }]}>
+            <Ionicons name="call" size={12} color="#FFFFFF" />
           </View>
         ) : null}
       </TouchableOpacity>
@@ -250,6 +273,16 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "700",
+  },
+  phoneBadge: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   contentContainer: {
     flex: 1,

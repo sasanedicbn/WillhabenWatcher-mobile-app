@@ -66,6 +66,30 @@ function extractMileage(text) {
   return null;
 }
 
+function extractPhoneNumber(text) {
+  if (!text) return null;
+  
+  const patterns = [
+    /\+43\s*\d{1,4}[\s\-\/]?\d{3,}[\s\-\/]?\d{2,}/g,
+    /0\d{3,4}[\s\-\/]?\d{3,}[\s\-\/]?\d{2,}/g,
+    /\b06\d{2}[\s\-\/]?\d{3}[\s\-\/]?\d{2,4}\b/g,
+    /\b0\d{3}[\s\-\/]?\d{6,}\b/g,
+  ];
+  
+  for (const pattern of patterns) {
+    const matches = text.match(pattern);
+    if (matches && matches.length > 0) {
+      let phone = matches[0].replace(/[\s\-\/]/g, '');
+      if (phone.startsWith('0') && !phone.startsWith('00')) {
+        phone = '+43' + phone.substring(1);
+      }
+      return phone;
+    }
+  }
+  
+  return null;
+}
+
 function parseVehiclesFromHTML(html) {
   const vehicles = [];
   
@@ -111,6 +135,8 @@ function parseVehiclesFromHTML(html) {
     const fuelType = fuelMatch ? fuelMatch[1] : null;
 
     if (title && title.length > 3) {
+      const phone = extractPhoneNumber(articleHtml);
+      
       vehicles.push({
         id: `wh-${id}`,
         title,
@@ -121,7 +147,7 @@ function parseVehiclesFromHTML(html) {
         fuelType,
         imageUrl,
         willhabenUrl,
-        phone: null,
+        phone,
       });
     }
   }
@@ -185,6 +211,9 @@ function parseVehiclesFromJSON(html) {
             ? `https://www.willhaben.at/iad/${seoUrl}`
             : `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${ad.id}`;
 
+          const bodyText = ad.description || getAttr('BODY') || getAttr('DESCRIPTION') || '';
+          const phone = extractPhoneNumber(bodyText);
+
           vehicles.push({
             id: `wh-${ad.id}`,
             title: ad.description || getAttr('HEADING') || 'Unknown Vehicle',
@@ -195,7 +224,7 @@ function parseVehiclesFromJSON(html) {
             fuelType,
             imageUrl,
             willhabenUrl,
-            phone: null,
+            phone,
           });
         }
       }
