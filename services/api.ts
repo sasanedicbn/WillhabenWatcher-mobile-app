@@ -12,6 +12,7 @@ export interface Vehicle {
   imageUrl: string | null;
   willhabenUrl: string | null;
   phone: string | null;
+  sellerName: string | null;
   isNew?: boolean;
   firstSeenAt?: string;
 }

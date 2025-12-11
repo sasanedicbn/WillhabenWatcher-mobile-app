@@ -99,6 +99,33 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
     }
   };
 
+  const handleSearchSeller = async () => {
+    if (vehicle.sellerName) {
+      const searchQuery = encodeURIComponent(vehicle.sellerName);
+      const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${encodeURIComponent(vehicle.location || 'Österreich')}`;
+      
+      try {
+        await WebBrowser.openBrowserAsync(dasSchnelleUrl);
+      } catch {
+        Alert.alert("Greška", "Nije moguće otvoriti pretragu");
+      }
+    } else {
+      Alert.alert(
+        "Nema imena prodavača",
+        "Ime prodavača nije dostupno za ovaj oglas. Otvaram Willhaben stranicu.",
+        [
+          {
+            text: "OK",
+            onPress: async () => {
+              const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
+              await WebBrowser.openBrowserAsync(url);
+            },
+          },
+        ]
+      );
+    }
+  };
+
   const handleMessagePress = async () => {
     setCurrentPhone(vehicle.phone || null);
     const messageTemplate = `Hallöchen 🥰🥰🥰 haben Sie kurz Zeit für ein Telefonat? Er gefällt mir und der Preis passt mir auch.
@@ -229,11 +256,11 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={handleCardPress}
+            onPress={handleSearchSeller}
             activeOpacity={0.6}
-            style={[styles.iconButton, { backgroundColor: colors.backgroundSecondary }]}
+            style={[styles.iconButton, { backgroundColor: vehicle.sellerName ? "#6366F1" : colors.backgroundSecondary }]}
           >
-            <Ionicons name="open-outline" size={20} color={colors.textSecondary} />
+            <Ionicons name="search" size={20} color={vehicle.sellerName ? "#FFFFFF" : colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>

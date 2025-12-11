@@ -137,6 +137,10 @@ function parseVehiclesFromHTML(html) {
     if (title && title.length > 3) {
       const phone = extractPhoneNumber(articleHtml);
       
+      const sellerMatch = articleHtml.match(/data-testid="ad-contact[^"]*"[^>]*>([^<]+)</i) ||
+                          articleHtml.match(/<span[^>]*class="[^"]*seller[^"]*"[^>]*>([^<]+)</i);
+      const sellerName = sellerMatch ? sellerMatch[1].trim() : null;
+      
       vehicles.push({
         id: `wh-${id}`,
         title,
@@ -148,6 +152,7 @@ function parseVehiclesFromHTML(html) {
         imageUrl,
         willhabenUrl,
         phone,
+        sellerName,
       });
     }
   }
@@ -213,6 +218,8 @@ function parseVehiclesFromJSON(html) {
 
           const bodyText = ad.description || getAttr('BODY') || getAttr('DESCRIPTION') || '';
           const phone = extractPhoneNumber(bodyText);
+          
+          const sellerName = getAttr('CONTACT_NAME') || getAttr('SELLER_NAME') || getAttr('ORGNAME') || null;
 
           vehicles.push({
             id: `wh-${ad.id}`,
@@ -225,6 +232,7 @@ function parseVehiclesFromJSON(html) {
             imageUrl,
             willhabenUrl,
             phone,
+            sellerName,
           });
         }
       }
