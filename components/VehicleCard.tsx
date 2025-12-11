@@ -100,12 +100,31 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleSearchSeller = async () => {
-    const searchQuery = vehicle.sellerName ? encodeURIComponent(vehicle.sellerName) : '';
-    const locationQuery = encodeURIComponent(vehicle.location || 'Österreich');
-    const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${locationQuery}`;
+    // Extract city from location (e.g. "1020 Wien" -> "wien", "2345 Brunn am Gebirge" -> "brunn-am-gebirge")
+    let locationStr = (vehicle.location || 'Wien').trim();
+    
+    // Remove postal code (Austrian postal codes are 4 digits)
+    locationStr = locationStr.replace(/^\d{4}\s*/, '');
+    
+    // Convert to URL-friendly format: lowercase, replace spaces with hyphens
+    const city = locationStr.toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-äöüß]/g, '') || 'wien';
+    
+    let heroldUrl: string;
+    if (vehicle.sellerName) {
+      // Herold.at format: /gelbe-seiten/{city}/name/{name}/
+      const nameSlug = vehicle.sellerName.toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-äöüß]/g, '');
+      heroldUrl = `https://www.herold.at/gelbe-seiten/${city}/name/${nameSlug}/`;
+    } else {
+      // Without seller name, just open Herold search page for that city
+      heroldUrl = `https://www.herold.at/gelbe-seiten/${city}/`;
+    }
     
     try {
-      await WebBrowser.openBrowserAsync(dasSchnelleUrl);
+      await WebBrowser.openBrowserAsync(heroldUrl);
     } catch {
       Alert.alert("Greška", "Nije moguće otvoriti pretragu");
     }
