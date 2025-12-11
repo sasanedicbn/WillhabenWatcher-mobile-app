@@ -100,29 +100,14 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleSearchSeller = async () => {
-    if (vehicle.sellerName) {
-      const searchQuery = encodeURIComponent(vehicle.sellerName);
-      const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${encodeURIComponent(vehicle.location || 'Österreich')}`;
-      
-      try {
-        await WebBrowser.openBrowserAsync(dasSchnelleUrl);
-      } catch {
-        Alert.alert("Greška", "Nije moguće otvoriti pretragu");
-      }
-    } else {
-      Alert.alert(
-        "Nema imena prodavača",
-        "Ime prodavača nije dostupno za ovaj oglas. Otvaram Willhaben stranicu.",
-        [
-          {
-            text: "OK",
-            onPress: async () => {
-              const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
-              await WebBrowser.openBrowserAsync(url);
-            },
-          },
-        ]
-      );
+    const searchQuery = vehicle.sellerName ? encodeURIComponent(vehicle.sellerName) : '';
+    const locationQuery = encodeURIComponent(vehicle.location || 'Österreich');
+    const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${locationQuery}`;
+    
+    try {
+      await WebBrowser.openBrowserAsync(dasSchnelleUrl);
+    } catch {
+      Alert.alert("Greška", "Nije moguće otvoriti pretragu");
     }
   };
 
