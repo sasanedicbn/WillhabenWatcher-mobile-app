@@ -232,7 +232,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           </ThemedText>
         </TouchableOpacity>
 
-        <View style={styles.buttonRow}>
+        <View style={styles.buttonColumn}>
           <TouchableOpacity
             onPress={handleMessagePress}
             activeOpacity={0.6}
@@ -345,19 +345,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: Spacing.xs,
   },
-  buttonRow: {
-    flexDirection: "row",
-    gap: Spacing.sm,
+  buttonColumn: {
+    flexDirection: "column",
+    gap: Spacing.xs,
     marginTop: Spacing.sm,
   },
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
+    width: "100%",
+    paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.sm,
-    gap: 4,
+    gap: 6,
   },
   buttonText: {
     color: "#FFFFFF",
