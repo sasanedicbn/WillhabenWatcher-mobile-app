@@ -100,33 +100,15 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleSearchSeller = async () => {
-    // Extract city from location (e.g. "1020 Wien" -> "wien", "2345 Brunn am Gebirge" -> "brunn-am-gebirge")
-    let locationStr = (vehicle.location || 'Wien').trim();
-    
-    // Remove postal code (Austrian postal codes are 4 digits)
-    locationStr = locationStr.replace(/^\d{4}\s*/, '');
-    
-    // Convert to URL-friendly format: lowercase, replace spaces with hyphens
-    const city = locationStr.toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-äöüß]/g, '') || 'wien';
-    
-    let heroldUrl: string;
-    if (vehicle.sellerName) {
-      // Herold.at format: /gelbe-seiten/{city}/name/{name}/
-      const nameSlug = vehicle.sellerName.toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-äöüß]/g, '');
-      heroldUrl = `https://www.herold.at/gelbe-seiten/${city}/name/${nameSlug}/`;
-    } else {
-      // Without seller name, just open Herold search page for that city
-      heroldUrl = `https://www.herold.at/gelbe-seiten/${city}/`;
-    }
+    // DasSchnelle.at - Austrian phone directory search
+    const searchQuery = vehicle.sellerName ? encodeURIComponent(vehicle.sellerName) : '';
+    const locationQuery = encodeURIComponent(vehicle.location || 'Österreich');
+    const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${locationQuery}`;
     
     try {
-      await WebBrowser.openBrowserAsync(heroldUrl);
+      await WebBrowser.openBrowserAsync(dasSchnelleUrl);
     } catch {
-      Alert.alert("Greška", "Nije moguće otvoriti pretragu");
+      Alert.alert("Fehler", "Die Suche konnte nicht geöffnet werden");
     }
   };
 
@@ -250,21 +232,23 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           </ThemedText>
         </TouchableOpacity>
 
-        <View style={styles.iconRow}>
+        <View style={styles.buttonRow}>
           <TouchableOpacity
             onPress={handleMessagePress}
             activeOpacity={0.6}
-            style={[styles.iconButton, { backgroundColor: colors.primary }]}
+            style={[styles.actionButton, { backgroundColor: colors.primary }]}
           >
-            <Ionicons name="mail-outline" size={20} color="#FFFFFF" />
+            <Ionicons name="mail-outline" size={16} color="#FFFFFF" />
+            <ThemedText style={styles.buttonText}>Pošalji poruku</ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleSearchSeller}
             activeOpacity={0.6}
-            style={[styles.iconButton, { backgroundColor: vehicle.sellerName ? "#6366F1" : colors.backgroundSecondary }]}
+            style={[styles.actionButton, { backgroundColor: "#6366F1" }]}
           >
-            <Ionicons name="search" size={20} color={vehicle.sellerName ? "#FFFFFF" : colors.textSecondary} />
+            <Ionicons name="search" size={16} color="#FFFFFF" />
+            <ThemedText style={styles.buttonText}>Potraži broj</ThemedText>
           </TouchableOpacity>
         </View>
       </View>
@@ -361,16 +345,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: Spacing.xs,
   },
-  iconRow: {
+  buttonRow: {
     flexDirection: "row",
-    gap: Spacing.md,
+    gap: Spacing.sm,
     marginTop: Spacing.sm,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.sm,
+  actionButton: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    gap: 4,
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

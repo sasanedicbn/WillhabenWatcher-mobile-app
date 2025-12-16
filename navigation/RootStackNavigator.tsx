@@ -1,6 +1,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Alert, Pressable, Switch, View, StyleSheet } from "react-native";
+import { Alert, Pressable, Switch, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 
@@ -23,43 +23,37 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function HeaderLeft() {
-  const { theme } = useTheme();
-
-  const handleLogout = () => {
-    Alert.alert("Logout", "No account connected");
-  };
+  const { isDark } = useTheme();
+  const { isRadioModeOn, toggleRadioMode } = useRadioMode();
+  const colors = isDark ? Colors.dark : Colors.light;
 
   return (
-    <Pressable
-      onPress={handleLogout}
-      style={({ pressed }) => [
-        styles.headerButton,
-        { opacity: pressed ? 0.6 : 1 },
-      ]}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <ThemedText
-        style={[styles.logoutText, { color: theme.textSecondary }]}
-      >
-        Logout
-      </ThemedText>
-    </Pressable>
+    <Switch
+      value={isRadioModeOn}
+      onValueChange={toggleRadioMode}
+      trackColor={{ false: colors.border, true: colors.success }}
+      thumbColor="#FFFFFF"
+      ios_backgroundColor={colors.border}
+      accessibilityLabel="Anrufmodus umschalten"
+      accessibilityHint="Aktivieren um Telefonanrufe zu ermöglichen"
+    />
   );
 }
 
 function HeaderRight() {
-  const { theme, isDark } = useTheme();
-  const { isRadioModeOn, toggleRadioMode } = useRadioMode();
+  const { isDark } = useTheme();
+  const { isRadioModeOn } = useRadioMode();
   const { currentPhone } = usePhone();
+  const colors = isDark ? Colors.dark : Colors.light;
 
   const handlePhoneCall = async () => {
     if (!isRadioModeOn) {
-      Alert.alert("Radio Mode Off", "Enable radio mode to make calls");
+      Alert.alert("Anrufmodus deaktiviert", "Aktiviere den Anrufmodus um anzurufen");
       return;
     }
 
     if (!currentPhone) {
-      Alert.alert("No Phone", "No phone number available for this vehicle");
+      Alert.alert("Keine Nummer", "Keine Telefonnummer für dieses Fahrzeug verfügbar");
       return;
     }
 
@@ -69,47 +63,42 @@ function HeaderRight() {
       if (supported) {
         await Linking.openURL(phoneUrl);
       } else {
-        Alert.alert("Error", "Phone calls are not supported on this device");
+        Alert.alert("Fehler", "Anrufe werden auf diesem Gerät nicht unterstützt");
       }
     } catch (error) {
-      Alert.alert("Error", "Could not initiate phone call");
+      Alert.alert("Fehler", "Anruf konnte nicht gestartet werden");
     }
   };
 
-  const colors = isDark ? Colors.dark : Colors.light;
+  const isActive = isRadioModeOn && currentPhone;
 
   return (
-    <View style={styles.headerRightContainer}>
-      <Pressable
-        onPress={handlePhoneCall}
-        style={({ pressed }) => [
-          styles.iconButton,
-          { opacity: pressed ? 0.6 : 1 },
-        ]}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        accessibilityLabel="Call seller"
-        accessibilityHint={
-          isRadioModeOn && currentPhone
-            ? "Double tap to call the seller"
-            : "Enable radio mode and select a vehicle with a phone number to call"
-        }
-      >
-        <Ionicons
-          name="call"
-          size={24}
-          color={isRadioModeOn && currentPhone ? colors.primary : theme.textSecondary}
-        />
-      </Pressable>
-      <Switch
-        value={isRadioModeOn}
-        onValueChange={toggleRadioMode}
-        trackColor={{ false: theme.border, true: colors.success }}
-        thumbColor="#FFFFFF"
-        ios_backgroundColor={theme.border}
-        accessibilityLabel="Radio mode toggle"
-        accessibilityHint="Toggle to enable or disable phone call functionality"
+    <Pressable
+      onPress={handlePhoneCall}
+      style={({ pressed }) => [
+        styles.callButton,
+        { 
+          backgroundColor: isActive ? colors.success : colors.backgroundSecondary,
+          opacity: pressed ? 0.7 : 1,
+        },
+      ]}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      accessibilityLabel="Verkäufer anrufen"
+      accessibilityHint={
+        isActive
+          ? "Doppeltippen um den Verkäufer anzurufen"
+          : "Aktiviere den Anrufmodus und wähle ein Fahrzeug mit Telefonnummer"
+      }
+    >
+      <Ionicons
+        name="call"
+        size={18}
+        color={isActive ? "#FFFFFF" : colors.textSecondary}
       />
-    </View>
+      <ThemedText style={[styles.callButtonText, { color: isActive ? "#FFFFFF" : colors.textSecondary }]}>
+        Pozovi
+      </ThemedText>
+    </Pressable>
   );
 }
 
@@ -148,19 +137,16 @@ export default function RootStackNavigator() {
 }
 
 const styles = StyleSheet.create({
-  headerButton: {
-    paddingVertical: Spacing.xs,
-  },
-  logoutText: {
-    fontSize: 14,
-    fontWeight: "400",
-  },
-  headerRightContainer: {
+  callButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: 20,
+    gap: Spacing.xs,
   },
-  iconButton: {
-    padding: Spacing.xs,
+  callButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
