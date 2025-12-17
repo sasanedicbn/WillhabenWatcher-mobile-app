@@ -93,6 +93,16 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
+  // If accessed from browser, redirect to Expo web app
+  const userAgent = req.get('User-Agent') || '';
+  if (userAgent.includes('Mozilla') || userAgent.includes('Chrome') || userAgent.includes('Safari')) {
+    // Redirect to the Expo web app on port 80
+    const host = req.get('Host') || '';
+    if (host.includes(':3000')) {
+      const expoHost = host.replace(':3000', '');
+      return res.redirect(`https://${expoHost}`);
+    }
+  }
   res.json({ 
     message: 'Willhaben Cars API',
     endpoints: ['/api/vehicles', '/api/vehicles/new', '/api/health'],
