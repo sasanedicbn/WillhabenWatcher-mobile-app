@@ -100,7 +100,23 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleSearchSeller = async () => {
-    // DasSchnelle.at - Austrian phone directory search
+    // If radio mode is ON and vehicle has phone, call directly
+    if (isRadioModeOn && hasPhone && vehicle.phone) {
+      try {
+        const phoneUrl = `tel:${vehicle.phone}`;
+        const supported = await Linking.canOpenURL(phoneUrl);
+        if (supported) {
+          await Linking.openURL(phoneUrl);
+        } else {
+          Alert.alert("Fehler", "Anrufe werden auf diesem Gerät nicht unterstützt");
+        }
+      } catch {
+        Alert.alert("Fehler", "Anruf konnte nicht gestartet werden");
+      }
+      return;
+    }
+    
+    // Otherwise, open DasSchnelle.at - Austrian phone directory search
     const searchQuery = vehicle.sellerName ? encodeURIComponent(vehicle.sellerName) : '';
     const locationQuery = encodeURIComponent(vehicle.location || 'Österreich');
     const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${locationQuery}`;
@@ -245,10 +261,13 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           <TouchableOpacity
             onPress={handleSearchSeller}
             activeOpacity={0.6}
-            style={[styles.actionButton, { backgroundColor: "#6366F1" }]}
+            style={[styles.actionButton, { backgroundColor: isRadioModeOn && hasPhone ? "#22C55E" : "#6366F1" }]}
           >
-            <Ionicons name="search" size={16} color="#FFFFFF" />
+            <Ionicons name={isRadioModeOn && hasPhone ? "call" : "search"} size={16} color="#FFFFFF" />
             <ThemedText style={styles.buttonText}>Potraži broj</ThemedText>
+            {isRadioModeOn && hasPhone ? (
+              <View style={styles.greenDot} />
+            ) : null}
           </TouchableOpacity>
         </View>
       </View>
@@ -363,5 +382,12 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "600",
+  },
+  greenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+    marginLeft: 4,
   },
 });
