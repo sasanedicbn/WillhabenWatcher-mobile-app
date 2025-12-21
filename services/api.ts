@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
+const PRODUCTION_API_URL: string | null = null;
+
 export interface Vehicle {
   id: string;
   title: string;
@@ -17,7 +19,11 @@ export interface Vehicle {
   firstSeenAt?: string;
 }
 
-const getBaseUrl = () => {
+export const getBaseUrl = () => {
+  if (PRODUCTION_API_URL) {
+    return PRODUCTION_API_URL;
+  }
+
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location) {
       const { protocol, hostname } = window.location;
@@ -97,3 +103,5 @@ export async function triggerScrape(): Promise<{ success: boolean; newCount: num
     return { success: false, newCount: 0 };
   }
 }
+
+export const API_BASE_URL = getBaseUrl();

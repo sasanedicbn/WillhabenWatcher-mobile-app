@@ -10,6 +10,7 @@ import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RadioModeProvider } from "@/context/RadioModeContext";
 import { PhoneProvider } from "@/context/PhoneContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 
 export default function App() {
   return (
@@ -17,13 +18,15 @@ export default function App() {
       <SafeAreaProvider>
         <GestureHandlerRootView style={styles.root}>
           <KeyboardProvider>
-            <RadioModeProvider>
-              <PhoneProvider>
-                <NavigationContainer>
-                  <RootStackNavigator />
-                </NavigationContainer>
-              </PhoneProvider>
-            </RadioModeProvider>
+            <NotificationProvider>
+              <RadioModeProvider>
+                <PhoneProvider>
+                  <NavigationContainer>
+                    <RootStackNavigator />
+                  </NavigationContainer>
+                </PhoneProvider>
+              </RadioModeProvider>
+            </NotificationProvider>
             <StatusBar style="auto" />
           </KeyboardProvider>
         </GestureHandlerRootView>

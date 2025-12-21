@@ -1,111 +1,135 @@
 # Willhaben Cars - React Native Expo App
 
 ## Overview
-A React Native Expo mobile application for browsing car listings from Willhaben (Austria). The app displays vehicle cards with images, prices, and specifications, allowing users to interact with listings through Google search, Willhaben deep links, and phone calls.
+A React Native Expo mobile application for real-time browsing of car listings from Willhaben (Austria). Features live scraping every 30 seconds, push notifications for new vehicles, and smart phone calling integration.
 
 ## Current State
-- **Version**: 1.0.0
-- **Last Updated**: December 1, 2025
-- **Status**: MVP Complete
+- **Version**: 1.1.0
+- **Last Updated**: December 21, 2025
+- **Status**: Production Ready (Push Notifications + Hetzner Deployment)
 
 ## Features
-1. **Vehicle List Screen**
+1. **Live Vehicle Scraping**
+   - Backend scrapes Willhaben every 30 seconds
+   - Shows vehicles up to €10,000 from private sellers
+   - In-memory storage (no database - intentional design)
+
+2. **Vehicle List Screen**
    - Scrollable list of vehicle cards sorted by newest
    - Each card shows: image, title, year, mileage, price
+   - New vehicle indicator badge
    - Message and chat action icons
 
-2. **Navigation Bar**
+3. **Smart "Potraži broj" Button**
+   - Radio mode ON + has phone: Green button, phone icon, direct call
+   - Radio mode OFF or no phone: Purple button, opens DasSchnelle.at
+
+4. **Navigation Bar**
    - "Logout" button (displays alert - no auth)
    - Headphone icon for phone calls
    - Radio toggle to enable/disable call mode
 
-3. **Card Interactions**
+5. **Push Notifications**
+   - Notifications when new vehicles are found
+   - Works even when app is closed (requires EAS build)
+
+6. **Card Interactions**
    - Tap image: Opens Google search for vehicle + location + "kontakt"
    - Tap card body: Navigates to Details screen
-   - Tap message/chat icons: Opens Willhaben app (deep link) or web fallback
-
-4. **Details Screen**
-   - Full vehicle specifications
-   - Price card with primary color styling
-   - Similar vehicles horizontal scroll list
-   - Each similar vehicle links to Willhaben
-
-5. **Phone Call Feature**
-   - When radio mode is ON and vehicle has phone number
-   - Headphone icon triggers phone call via `tel:` link
+   - Tap message/chat icons: Opens Willhaben app or web fallback
 
 ## Project Architecture
 
 ### File Structure
 ```
 /
-├── App.tsx                 # Root component with providers
-├── app.json               # Expo configuration
+├── App.tsx                     # Root component with providers
+├── app.json                    # Expo configuration
+├── EAS_BUILD_GUIDE.md          # Guide for building APK
 ├── components/
-│   ├── VehicleCard.tsx    # Main vehicle card component
+│   ├── VehicleCard.tsx         # Main vehicle card component
 │   ├── SimilarVehicleCard.tsx  # Mini card for similar vehicles
-│   ├── HeaderTitle.tsx    # Custom header with app icon
-│   ├── ErrorBoundary.tsx  # Error handling wrapper
-│   └── ...                # Shared components
+│   ├── HeaderTitle.tsx         # Custom header with app icon
+│   └── ErrorBoundary.tsx       # Error handling wrapper
 ├── context/
-│   ├── RadioModeContext.tsx   # Phone call mode state
-│   └── PhoneContext.tsx       # Current phone number state
-├── data/
-│   └── mockVehicles.ts    # Mock vehicle data
-├── navigation/
-│   ├── RootStackNavigator.tsx  # Main stack navigator
-│   └── screenOptions.ts       # Shared screen options
+│   ├── RadioModeContext.tsx    # Phone call mode state
+│   ├── PhoneContext.tsx        # Current phone number state
+│   └── NotificationContext.tsx # Push notification registration
+├── server/
+│   ├── index.js                # Express API + push notifications
+│   ├── scraper.js              # Willhaben scraper
+│   ├── Dockerfile              # Docker config for deployment
+│   ├── docker-compose.yml      # Docker Compose config
+│   ├── DEPLOYMENT.md           # Hetzner deployment guide
+│   └── package.json            # Server dependencies
+├── services/
+│   └── api.ts                  # API client with production URL support
 ├── screens/
-│   ├── HomeScreen.tsx     # Vehicle list
-│   └── DetailsScreen.tsx  # Vehicle details
-├── constants/
-│   └── theme.ts           # Colors, spacing, typography
-└── hooks/
-    ├── useScreenInsets.ts # Safe area handling
-    └── useTheme.ts        # Theme hook
+│   ├── HomeScreen.tsx          # Vehicle list
+│   └── DetailsScreen.tsx       # Vehicle details
+└── constants/
+    └── theme.ts                # Colors, spacing, typography
 ```
 
-### Navigation
-- Stack-based navigation (no tab bar)
-- Two screens: Home and Details
-- Transparent header on Home screen
-- Standard header on Details screen
+### API Endpoints (Server)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/vehicles` | GET | Get all vehicles (max 100) |
+| `/api/vehicles/new` | GET | Get newly found vehicles |
+| `/api/vehicles/mark-seen` | POST | Mark vehicles as seen |
+| `/api/scrape` | POST | Trigger manual scrape |
+| `/api/health` | GET | Health check |
+| `/api/register-push-token` | POST | Register device for push notifications |
 
 ### State Management
-- React Context for radio mode and phone number
-- Local state for vehicle data loading
-- No external state management library
+- React Context for radio mode, phone number, and notifications
+- In-memory Map/Set on server for vehicle storage
+- No external database - by design
 
 ### Styling
-- Custom theme in `constants/theme.ts`
 - Primary color: #1E40AF (deep blue)
-- Success color: #10B981 (green for toggle)
-- Consistent border radius and spacing
+- Success color: #22C55E (green for radio mode)
+- Purple: #7C3AED (DasSchnelle.at button)
 
 ## User Preferences
+- Language: Croatian/Serbian for UI, German for phone-related features
 - No authentication required (personal use app)
-- Mock data API (ready for real API integration)
-- Austrian locale formatting (EUR currency, German dates)
+- Austrian locale formatting (EUR currency)
+
+## Deployment
+
+### Option 1: Replit (Current)
+- App runs via `npm run dev`
+- Server on port 8082, Expo web on port 8081
+- External port 3000 maps to API
+
+### Option 2: Hetzner VPS (Recommended for Production)
+- See `server/DEPLOYMENT.md` for full guide
+- ~€4/month for CX11 VPS
+- Docker deployment
+
+### Building APK
+- See `EAS_BUILD_GUIDE.md` for instructions
+- Requires EAS account on expo.dev
+- Must set `projectId` in app.json for push notifications
 
 ## Recent Changes
+- December 21, 2025:
+  - Added push notifications support
+  - Created Hetzner deployment files (Dockerfile, docker-compose.yml)
+  - Added EAS build guide
+  - Smart "Potraži broj" button with conditional behavior
 - December 1, 2025: Initial MVP created
-  - Implemented vehicle list with cards
-  - Added details screen with specifications
-  - Integrated Willhaben deep linking
-  - Added phone call functionality with radio toggle
-  - Generated app icon
 
 ## Dependencies
 - Expo SDK 54
 - React Navigation 7
-- expo-linking (for deep links and phone calls)
-- expo-web-browser (for opening browser URLs)
-- expo-image (for optimized images)
-- react-native-reanimated (for animations)
+- expo-notifications (push notifications)
+- expo-device (device detection)
+- expo-linking, expo-web-browser
+- expo-image, react-native-reanimated
 
-## Next Steps (Future Enhancements)
-1. Integrate real Willhaben RSS feed or API
-2. Add push notifications for new listings
-3. Implement search and filtering
-4. Add favorites with AsyncStorage persistence
-5. Background sync for new vehicle alerts
+## Important Notes
+- **No database by design** - in-memory only, data resets on restart
+- **Push notifications require EAS Project ID** - set in app.json
+- **Scraping every 30 seconds** - Willhaben might block if too aggressive
