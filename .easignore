@@ -1,0 +1,7 @@
+server/
+attached_assets/
+scripts/
+*.md
+.git/
+node_modules/
+.expo/
