@@ -33,7 +33,7 @@ export const getBaseUrl = () => {
       }
       
       if (hostname.includes('replit') || hostname.includes('riker')) {
-        const url = `${protocol}//${hostname}:3000`;
+        const url = `${protocol}//${hostname}:8082`;
         console.log('Backend URL:', url);
         return url;
       }
@@ -44,7 +44,7 @@ export const getBaseUrl = () => {
   if (hostUri) {
     const host = hostUri.split(':')[0];
     if (host.includes('replit') || host.includes('riker')) {
-      return `https://${host}:3000`;
+      return `https://${host}:8082`;
     }
     return `http://${host}:8082`;
   }
