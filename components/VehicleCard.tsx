@@ -35,7 +35,6 @@ const springConfig: WithSpringConfig = {
   mass: 0.3,
   stiffness: 150,
   overshootClamping: true,
-  energyThreshold: 0.001,
 };
 
 const AnimatedView = Animated.createAnimatedComponent(View);
@@ -141,6 +140,10 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
         "Poruka je kopirana u clipboard. Sad idi na stranicu i zalijepi je.",
         [
           {
+            text: "Zatvori",
+            style: "cancel",
+          },
+          {
             text: "Otvori Willhaben",
             onPress: async () => {
               const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
@@ -149,8 +152,21 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           },
         ]
       );
-    } catch {
-      Alert.alert("Error", "Could not copy message");
+    } catch (error) {
+      console.error("Clipboard error:", error);
+      Alert.alert(
+        "Greska",
+        "Nije moguce kopirati poruku. Pokusavam otvoriti Willhaben direktno.",
+        [
+          {
+            text: "OK",
+            onPress: async () => {
+              const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
+              await WebBrowser.openBrowserAsync(url);
+            },
+          },
+        ]
+      );
     }
   };
 
