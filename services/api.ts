@@ -26,25 +26,27 @@ export const getBaseUrl = () => {
 
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location) {
-      const { protocol, hostname } = window.location;
+      const { protocol, hostname, port } = window.location;
       
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return 'http://localhost:8082';
       }
       
       if (hostname.includes('replit') || hostname.includes('riker')) {
-        const url = `${protocol}//${hostname}:8082`;
-        console.log('Backend URL:', url);
-        return url;
+        const apiUrl = `${protocol}//${hostname}:3000`;
+        console.log('[API] Using Replit external URL:', apiUrl);
+        return apiUrl;
       }
     }
     return 'http://localhost:8082';
   }
+  
   const hostUri = Constants.expoConfig?.hostUri;
   if (hostUri) {
     const host = hostUri.split(':')[0];
     if (host.includes('replit') || host.includes('riker')) {
-      return `https://${host}:8082`;
+      console.log('[API] Using Expo Go URL for Replit:', `https://${host}:3000`);
+      return `https://${host}:3000`;
     }
     return `http://${host}:8082`;
   }
