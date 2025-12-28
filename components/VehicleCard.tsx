@@ -139,40 +139,18 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
 06643972640`;
 
+    const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
+    
     try {
       await Clipboard.setStringAsync(messageTemplate);
-      Alert.alert(
-        "Poruka kopirana!",
-        "Poruka je kopirana u clipboard. Sad idi na stranicu i zalijepi je.",
-        [
-          {
-            text: "Zatvori",
-            style: "cancel",
-          },
-          {
-            text: "Otvori Willhaben",
-            onPress: async () => {
-              const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
-              await WebBrowser.openBrowserAsync(url);
-            },
-          },
-        ]
-      );
     } catch (error) {
       console.error("Clipboard error:", error);
-      Alert.alert(
-        "Greska",
-        "Nije moguce kopirati poruku. Pokusavam otvoriti Willhaben direktno.",
-        [
-          {
-            text: "OK",
-            onPress: async () => {
-              const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
-              await WebBrowser.openBrowserAsync(url);
-            },
-          },
-        ]
-      );
+    }
+    
+    try {
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      Alert.alert("Greška", "Nije moguće otvoriti Willhaben");
     }
   };
 
