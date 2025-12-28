@@ -115,9 +115,15 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       return;
     }
     
-    // Otherwise, open DasSchnelle.at - Austrian phone directory search
-    const searchQuery = vehicle.sellerName ? encodeURIComponent(vehicle.sellerName) : '';
-    const locationQuery = encodeURIComponent(vehicle.location || 'Österreich');
+    // Extract postal code from location (Austrian postal codes are 4 digits)
+    const location = vehicle.location || '';
+    const postalCodeMatch = location.match(/\d{4}/);
+    const postalCode = postalCodeMatch ? postalCodeMatch[0] : (location || 'Österreich');
+    
+    // Use seller name for "what" field and postal code for "where" field
+    const sellerName = vehicle.sellerName || '';
+    const searchQuery = encodeURIComponent(sellerName);
+    const locationQuery = encodeURIComponent(postalCode);
     const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${locationQuery}`;
     
     try {
