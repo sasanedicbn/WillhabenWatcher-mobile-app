@@ -3,7 +3,7 @@ const cors = require('cors');
 const scraper = require('./scraper');
 
 const app = express();
-const PORT = process.env.PORT || 8082;
+const PORT = process.env.API_PORT || 8083;
 
 app.use(cors());
 app.use(express.json());
@@ -177,14 +177,6 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  const userAgent = req.get('User-Agent') || '';
-  if (userAgent.includes('Mozilla') || userAgent.includes('Chrome') || userAgent.includes('Safari')) {
-    const host = req.get('Host') || '';
-    if (host.includes(':3000')) {
-      const expoHost = host.replace(':3000', '');
-      return res.redirect(`https://${expoHost}`);
-    }
-  }
   res.json({ 
     message: 'Willhaben Cars API',
     endpoints: ['/api/vehicles', '/api/vehicles/new', '/api/health', '/api/register-push-token'],
