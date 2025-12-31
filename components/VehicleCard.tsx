@@ -40,6 +40,7 @@ const springConfig: WithSpringConfig = {
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
+  console.log(vehicle, "podaci vehicle");
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const { isRadioModeOn } = useRadioMode();
@@ -90,7 +91,9 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       return;
     }
 
-    const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
+    const url =
+      vehicle.willhabenUrl ||
+      `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace("wh-", "")}`;
     try {
       await WebBrowser.openBrowserAsync(url);
     } catch {
@@ -99,33 +102,42 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleSearchSeller = async () => {
-    // If radio mode is ON and vehicle has phone, call directly
+    // Ako je radio mode ON i ima telefon – poziv kao i prije
     if (isRadioModeOn && hasPhone && vehicle.phone) {
       try {
         const phoneUrl = `tel:${vehicle.phone}`;
         const supported = await Linking.canOpenURL(phoneUrl);
         if (supported) {
           await Linking.openURL(phoneUrl);
-        } else {
-          Alert.alert("Fehler", "Anrufe werden auf diesem Gerät nicht unterstützt");
         }
       } catch {
         Alert.alert("Fehler", "Anruf konnte nicht gestartet werden");
       }
       return;
     }
-    
-    // Extract postal code from location (Austrian postal codes are 4 digits)
-    const location = vehicle.location || '';
-    const postalCodeMatch = location.match(/\d{4}/);
-    const postalCode = postalCodeMatch ? postalCodeMatch[0] : (location || 'Österreich');
-    
-    // Use seller name for "what" field and postal code for "where" field
-    const sellerName = vehicle.sellerName || '';
-    const searchQuery = encodeURIComponent(sellerName);
-    const locationQuery = encodeURIComponent(postalCode);
+
+    // ===== IME I PREZIME =====
+    const fullName = vehicle.sellerName?.trim() || "";
+
+    // ===== GRAD (uklanjamo poštanski broj) =====
+    // npr "1010 Wien" -> "Wien"
+    const city = (vehicle.location || "").replace(/\d{4}/g, "").trim();
+
+    // ===== STRING ZA CLIPBOARD =====
+    const clipboardText = `${fullName}, ${city}`;
+
+    try {
+      await Clipboard.setStringAsync(clipboardText);
+    } catch (err) {
+      console.error("Clipboard error:", err);
+    }
+
+    // ===== DASSCHNELLE PRETRAGA (kao prije) =====
+    const searchQuery = encodeURIComponent(fullName);
+    const locationQuery = encodeURIComponent(city || "Österreich");
+
     const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${locationQuery}`;
-    
+
     try {
       await WebBrowser.openBrowserAsync(dasSchnelleUrl);
     } catch {
@@ -139,14 +151,16 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
 06643972640`;
 
-    const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace('wh-', '')}`;
-    
+    const url =
+      vehicle.willhabenUrl ||
+      `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace("wh-", "")}`;
+
     try {
       await Clipboard.setStringAsync(messageTemplate);
     } catch (error) {
       console.error("Clipboard error:", error);
     }
-    
+
     try {
       await WebBrowser.openBrowserAsync(url);
     } catch {
@@ -189,7 +203,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
         },
         animatedStyle,
       ]}
-      accessibilityLabel={`${vehicle.title}, ${vehicle.year || 'Jahr unbekannt'}, ${formatPrice(vehicle.price)}`}
+      accessibilityLabel={`${vehicle.title}, ${vehicle.year || "Jahr unbekannt"}, ${formatPrice(vehicle.price)}`}
     >
       <TouchableOpacity
         onPress={handleImagePress}
@@ -210,7 +224,12 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           </View>
         ) : null}
         {hasPhone ? (
-          <View style={[styles.phoneBadge, { backgroundColor: isRadioModeOn ? "#22C55E" : "#6B7280" }]}>
+          <View
+            style={[
+              styles.phoneBadge,
+              { backgroundColor: isRadioModeOn ? "#22C55E" : "#6B7280" },
+            ]}
+          >
             <Ionicons name="call" size={16} color="#FFFFFF" />
           </View>
         ) : null}
@@ -232,14 +251,21 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
               {vehicle.title}
             </ThemedText>
             {hasPhone ? (
-              <View style={[styles.phoneTag, { backgroundColor: isRadioModeOn ? "#22C55E" : "#3B82F6" }]}>
+              <View
+                style={[
+                  styles.phoneTag,
+                  { backgroundColor: isRadioModeOn ? "#22C55E" : "#3B82F6" },
+                ]}
+              >
                 <Ionicons name="call" size={14} color="#FFFFFF" />
                 <ThemedText style={styles.phoneTagText}>TEL</ThemedText>
               </View>
             ) : null}
           </View>
 
-          <ThemedText style={[styles.metadata, { color: colors.textSecondary }]}>
+          <ThemedText
+            style={[styles.metadata, { color: colors.textSecondary }]}
+          >
             {getMetadata()}
           </ThemedText>
 
@@ -261,9 +287,19 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           <TouchableOpacity
             onPress={handleSearchSeller}
             activeOpacity={0.6}
-            style={[styles.actionButton, { backgroundColor: isRadioModeOn && hasPhone ? "#22C55E" : "#6366F1" }]}
+            style={[
+              styles.actionButton,
+              {
+                backgroundColor:
+                  isRadioModeOn && hasPhone ? "#22C55E" : "#6366F1",
+              },
+            ]}
           >
-            <Ionicons name={isRadioModeOn && hasPhone ? "call" : "search"} size={16} color="#FFFFFF" />
+            <Ionicons
+              name={isRadioModeOn && hasPhone ? "call" : "search"}
+              size={16}
+              color="#FFFFFF"
+            />
             <ThemedText style={styles.buttonText}>Potraži broj</ThemedText>
             {isRadioModeOn && hasPhone ? (
               <View style={styles.greenDot} />
