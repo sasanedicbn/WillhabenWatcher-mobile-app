@@ -17,32 +17,38 @@ Za pravu instalaciju koja ostaje na telefonu, trebamo napraviti APK build.
 ### Koraci:
 
 #### 1. Instaliraj EAS CLI (na računalu)
+
 ```bash
 npm install -g eas-cli
 ```
 
 #### 2. Prijavi se na Expo
+
 ```bash
 eas login
 # Napravi račun na expo.dev ako ga nemaš
 ```
 
 #### 3. Konfiguriši EAS Build
+
 ```bash
 eas build:configure
 ```
 
 #### 4. Napravi APK za Android
+
 ```bash
 eas build --platform android --profile preview
 ```
 
 Ovo će:
+
 - Napraviti APK koji možeš skinuti
 - Build traje 10-15 minuta
 - Dobiješ link za download APK-a
 
 #### 5. Instaliraj na telefon
+
 - Skini APK na Android telefon
 - Otvori ga i instaliraj (dozvoli "Unknown sources")
 - Aplikacija ostaje instalirana trajno!
@@ -82,10 +88,11 @@ Prije builda, ažuriraj `services/api.ts`:
 
 ```typescript
 // Dodaj na početak datoteke:
-const PRODUCTION_API_URL = 'https://your-hetzner-server.com';
+const PRODUCTION_API_URL =
+  "https://willhabenwatcher-mobile-app-production.up.railway.app";
 
 // Ili IP adresa:
-const PRODUCTION_API_URL = 'http://YOUR_VPS_IP:8082';
+const PRODUCTION_API_URL = "http://YOUR_VPS_IP:8082";
 
 // Ažuriraj getBaseUrl() da koristi PRODUCTION_API_URL u production buildu
 ```
@@ -124,6 +131,7 @@ Za push notifikacije MORAŠ napraviti EAS projekt:
 ## iOS (iPhone)
 
 Za iOS build trebaš:
+
 - Apple Developer Account ($99/godišnje)
 - Mac računalo za generiranje certifikata
 
@@ -133,9 +141,9 @@ Za osobnu upotrebu, Android APK je besplatan i jednostavniji.
 
 ## Sažetak
 
-| Metoda | Cijena | Složenost | Trajnost |
-|--------|--------|-----------|----------|
-| Expo Go | Besplatno | Lako | Treba QR svaki put |
-| Android APK | Besplatno | Srednje | Trajna instalacija |
-| Play Store | $25 (jednom) | Složeno | Automatska ažuriranja |
-| iOS TestFlight | $99/god | Složeno | 90 dana |
+| Metoda         | Cijena       | Složenost | Trajnost              |
+| -------------- | ------------ | --------- | --------------------- |
+| Expo Go        | Besplatno    | Lako      | Treba QR svaki put    |
+| Android APK    | Besplatno    | Srednje   | Trajna instalacija    |
+| Play Store     | $25 (jednom) | Složeno   | Automatska ažuriranja |
+| iOS TestFlight | $99/god      | Složeno   | 90 dana               |

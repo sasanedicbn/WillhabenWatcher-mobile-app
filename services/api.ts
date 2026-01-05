@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-const PRODUCTION_API_URL: string | null = null;
+const PRODUCTION_API_URL: string | null = 'https://willhabenwatcher-mobile-app-production.up.railway.app';
 
 export interface Vehicle {
   id: string;
@@ -20,10 +20,11 @@ export interface Vehicle {
 }
 
 export const getBaseUrl = () => {
-  if (PRODUCTION_API_URL) {
-    return PRODUCTION_API_URL;
-  }
+  if (PRODUCTION_API_URL) return PRODUCTION_API_URL; // <- Railway URL
+  return 'http://localhost:8083'; // za lokalno testiranje
+};
 
+export function getApiBaseUrl() {
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location) {
       const { protocol, hostname } = window.location;
@@ -52,8 +53,9 @@ export const getBaseUrl = () => {
     }
     return `http://${host}:8083`;
   }
+
   return 'http://localhost:8083';
-};
+}
 
 export async function fetchVehicles(): Promise<{ vehicles: Vehicle[]; lastScrapeTime: string | null }> {
   try {
