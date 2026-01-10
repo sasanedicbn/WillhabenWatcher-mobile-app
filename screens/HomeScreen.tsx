@@ -17,7 +17,7 @@ import { usePhone } from "@/context/PhoneContext";
 import { useNewCarSound } from "@/hooks/useNewCarSound";
 import { fetchVehicles, markVehiclesAsSeen, Vehicle } from "@/services/api";
 
-// const POLL_INTERVAL = 10000;
+const POLL_INTERVAL = 10000;
 const getPollInterval = () => {
   const now = new Date();
   const hours = now.getHours();

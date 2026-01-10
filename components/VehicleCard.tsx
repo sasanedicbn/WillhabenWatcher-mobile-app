@@ -40,7 +40,6 @@ const springConfig: WithSpringConfig = {
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
-  console.log(vehicle, "podaci vehicle");
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const { isRadioModeOn } = useRadioMode();
@@ -102,38 +101,69 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleSearchSeller = async () => {
-    // Ako je radio mode ON i ima telefon – poziv kao i prije
+    // RADIO MODE – POZIV
     if (isRadioModeOn && hasPhone && vehicle.phone) {
       try {
         const phoneUrl = `tel:${vehicle.phone}`;
         const supported = await Linking.canOpenURL(phoneUrl);
-        if (supported) {
-          await Linking.openURL(phoneUrl);
-        }
+        if (supported) await Linking.openURL(phoneUrl);
       } catch {
         Alert.alert("Fehler", "Anruf konnte nicht gestartet werden");
       }
       return;
     }
 
-    // ===== IME I PREZIME =====
-    const fullName = vehicle.sellerName?.trim() || "";
+    let fullName = vehicle.sellerName?.trim() || "";
 
-    // ===== GRAD (uklanjamo poštanski broj) =====
-    // npr "1010 Wien" -> "Wien"
-    const city = (vehicle.location || "").replace(/\d{4}/g, "").trim();
+    // ===== FETCH IMENA SA OGLASA AKO GA NEMA =====
+    if (!fullName && vehicle.willhabenUrl) {
+      try {
+        const response = await fetch(vehicle.willhabenUrl);
+        const html = await response.text();
+
+        // Ovo pretražuje <span data-testid="bottom-contact-box-seller-name">…</span>
+        const patterns = [
+          /data-testid=["']bottom-contact-box-seller-name["'][\s\S]*?<font[^>]*>\s*<font[^>]*>\s*([^<]+)\s*<\/font>/i,
+          /"contactName"\s*:\s*"([^"]+)"/i,
+        ];
+
+        for (const p of patterns) {
+          const m = html.match(p);
+          if (m) {
+            fullName = m[1].trim();
+            break;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch seller name:", err);
+      }
+    }
+
+    // ===== GRAD + POŠTANSKI BROJ =====
+    let city = vehicle.location || "";
+    let postcode = "";
+
+    const match = city.match(/^(\d{4})\s*(.*)/); // hvata 4-cifreni postcode i ostatak
+    if (match) {
+      postcode = match[1];
+      city = match[2];
+    }
 
     // ===== STRING ZA CLIPBOARD =====
-    const clipboardText = `${fullName}, ${city}`;
+    const clipboardText =
+      `${fullName}` +
+      `${postcode ? ", " + postcode : ""}` +
+      `${city ? " " + city : ""}`;
 
     try {
       await Clipboard.setStringAsync(clipboardText);
+      Alert.alert("Kopirano u clipboard", clipboardText);
     } catch (err) {
       console.error("Clipboard error:", err);
     }
 
-    // ===== DASSCHNELLE PRETRAGA (kao prije) =====
-    const searchQuery = encodeURIComponent(fullName);
+    // ===== DASSCHNELLE PRETRAGA =====
+    const searchQuery = encodeURIComponent(fullName || "");
     const locationQuery = encodeURIComponent(city || "Österreich");
 
     const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${locationQuery}`;
@@ -181,13 +211,21 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
     if (!mileage) return "";
     return new Intl.NumberFormat("de-AT").format(mileage) + " km";
   };
-
   const getMetadata = () => {
     const parts = [];
     if (vehicle.year) parts.push(vehicle.year.toString());
     if (vehicle.mileage) parts.push(formatMileage(vehicle.mileage));
     if (vehicle.fuelType) parts.push(vehicle.fuelType);
-    return parts.join(" • ") || vehicle.location;
+
+    // Dodaj lokaciju + poštanski broj
+    if (vehicle.location) {
+      const loc = vehicle.postcode
+        ? `${vehicle.postcode} ${vehicle.location}`
+        : vehicle.location;
+      parts.push(loc);
+    }
+
+    return parts.join(" • ");
   };
 
   const placeholderImage = "https://via.placeholder.com/200x200.png?text=Auto";
