@@ -68,7 +68,7 @@ export default function HomeScreen() {
 
           previousVehicleIds.current = newIds;
         }
-
+        console.log(data, "DOlaze");
         setVehicles(data.vehicles);
         setLastScrapeTime(data.lastScrapeTime);
       } catch (error) {

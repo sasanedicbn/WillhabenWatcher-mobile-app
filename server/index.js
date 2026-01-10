@@ -80,16 +80,19 @@ async function scrapeAndStore() {
 
     for (const vehicle of scrapedVehicles) {
       if (!vehicleCache.has(vehicle.id)) {
-        if (!isFirstScrape) {
-          newVehicleIds.add(vehicle.id);
-          newCount++;
-          newlyFoundVehicles.push(vehicle);
-        }
-        vehicleCache.set(vehicle.id, {
+        const newVehicle = {
           ...vehicle,
           isNew: !isFirstScrape,
           firstSeenAt: new Date().toISOString(),
-        });
+        };
+
+        console.log("ADDING VEHICLE TO CACHE:", newVehicle); // 🔹 log
+        vehicleCache.set(vehicle.id, newVehicle);
+
+        if (!isFirstScrape) {
+          newVehicleIds.add(vehicle.id);
+          newlyFoundVehicles.push(newVehicle);
+        }
       }
     }
 
@@ -133,6 +136,7 @@ app.delete("/api/register-push-token", (req, res) => {
 
 app.get("/api/vehicles", (req, res) => {
   const vehicles = Array.from(vehicleCache.values())
+    .filter((v) => v.isPrivate === 1)
     .sort((a, b) => new Date(b.firstSeenAt) - new Date(a.firstSeenAt))
     .slice(0, 100);
 
@@ -217,11 +221,9 @@ function getNextScrapeDelay() {
   }
 }
 
-// PROMENI OVU FUNKCIJU (tvoj postojeći startServer)
 async function startServer() {
   await scrapeAndStore();
 
-  // UMESTO scheduleNextScrape, KORISTI OVO:
   async function scheduledScrape() {
     try {
       await scrapeAndStore();

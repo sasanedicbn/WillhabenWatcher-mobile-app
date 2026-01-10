@@ -40,6 +40,7 @@ const springConfig: WithSpringConfig = {
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
+  console.log(vehicle, "vozilo koje ulazi");
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const { isRadioModeOn } = useRadioMode();
