@@ -40,7 +40,7 @@ const springConfig: WithSpringConfig = {
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
-  console.log(vehicle, "vozilo koje ulazi");
+  // console.log(vehicle, "vozilo koje ulazi");
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const { isRadioModeOn } = useRadioMode();
@@ -102,7 +102,9 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleSearchSeller = async () => {
-    // RADIO MODE – POZIV
+    console.log("VEHICLE:", vehicle);
+
+    // ===== RADIO MODE – POZIV =====
     if (isRadioModeOn && hasPhone && vehicle.phone) {
       try {
         const phoneUrl = `tel:${vehicle.phone}`;
@@ -114,15 +116,15 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       return;
     }
 
+    // ===== IME PRODAAVCA =====
     let fullName = vehicle.sellerName?.trim() || "";
 
-    // ===== FETCH IMENA SA OGLASA AKO GA NEMA =====
+    // Ako nema imena – pokušaj dohvatiti sa oglasa
     if (!fullName && vehicle.willhabenUrl) {
       try {
         const response = await fetch(vehicle.willhabenUrl);
         const html = await response.text();
 
-        // Ovo pretražuje <span data-testid="bottom-contact-box-seller-name">…</span>
         const patterns = [
           /data-testid=["']bottom-contact-box-seller-name["'][\s\S]*?<font[^>]*>\s*<font[^>]*>\s*([^<]+)\s*<\/font>/i,
           /"contactName"\s*:\s*"([^"]+)"/i,
@@ -140,21 +142,14 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       }
     }
 
-    // ===== GRAD + POŠTANSKI BROJ =====
-    let city = vehicle.location || "";
-    let postcode = "";
+    // ===== GRAD + POŠTANSKI BROJ (ISPRAVNO) =====
+    const city = vehicle.location || "";
+    const postcode = vehicle.postcode || "";
 
-    const match = city.match(/^(\d{4})\s*(.*)/); // hvata 4-cifreni postcode i ostatak
-    if (match) {
-      postcode = match[1];
-      city = match[2];
-    }
-
-    // ===== STRING ZA CLIPBOARD =====
+    // ===== TEKST ZA CLIPBOARD =====
     const clipboardText =
-      `${fullName}` +
-      `${postcode ? ", " + postcode : ""}` +
-      `${city ? " " + city : ""}`;
+      // `${fullName || ""}` +
+      `${postcode ? ", " + postcode : ""}` + `${city ? " " + city : ""}`;
 
     try {
       await Clipboard.setStringAsync(clipboardText);
@@ -165,7 +160,9 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 
     // ===== DASSCHNELLE PRETRAGA =====
     const searchQuery = encodeURIComponent(fullName || "");
-    const locationQuery = encodeURIComponent(city || "Österreich");
+    const locationQuery = encodeURIComponent(
+      `${postcode ? postcode + " " : ""}${city || "Österreich"}`
+    );
 
     const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${locationQuery}`;
 
