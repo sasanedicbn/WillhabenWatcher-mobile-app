@@ -209,6 +209,8 @@ function parseVehiclesFromJSON(html) {
 
       const getAttr = (name) =>
         attrs.find((a) => a.name === name)?.values?.[0] || null;
+      console.log(ad.attributes.attribute, "ad unutar JSON scrapa");
+      const postcode = getAttr("POSTCODE") || getAttr("ZIP") || null;
 
       const price =
         parseFloat(getAttr("PRICE/AMOUNT") || getAttr("PRICE")) || null;
@@ -248,6 +250,7 @@ function parseVehiclesFromJSON(html) {
         phone: extractPhoneNumber(bodyText),
         sellerName: getAttr("CONTACT_NAME") || null,
         isPrivate: isPrivateAd(attrs) ? 1 : 0,
+        postcode,
       });
     }
   } catch (e) {

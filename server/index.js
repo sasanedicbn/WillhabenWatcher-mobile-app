@@ -86,7 +86,7 @@ async function scrapeAndStore() {
           firstSeenAt: new Date().toISOString(),
         };
 
-        console.log("ADDING VEHICLE TO CACHE:", newVehicle); // 🔹 log
+        // console.log("ADDING VEHICLE TO CACHE:", newVehicle); // 🔹 log
         vehicleCache.set(vehicle.id, newVehicle);
 
         if (!isFirstScrape) {
