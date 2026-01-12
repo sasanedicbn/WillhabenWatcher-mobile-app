@@ -24,6 +24,7 @@ import { usePhone } from "@/context/PhoneContext";
 import { useRadioMode } from "@/context/RadioModeContext";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { Vehicle } from "@/services/api";
+import { DassSchnelleSearch } from "./DassSchnelleSearch";
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -40,7 +41,6 @@ const springConfig: WithSpringConfig = {
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
-  // console.log(vehicle, "vozilo koje ulazi");
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const { isRadioModeOn } = useRadioMode();
@@ -65,10 +65,9 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       `${vehicle.title} ${vehicle.location} telefon kontakt`
     );
     const googleUrl = `https://www.google.com/search?q=${searchQuery}`;
-
     try {
       await WebBrowser.openBrowserAsync(googleUrl);
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Could not open browser");
     }
   };
@@ -80,11 +79,8 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       try {
         const phoneUrl = `tel:${vehicle.phone}`;
         const supported = await Linking.canOpenURL(phoneUrl);
-        if (supported) {
-          await Linking.openURL(phoneUrl);
-        } else {
-          Alert.alert("Greška", "Pozivi nisu podržani na ovom uređaju");
-        }
+        if (supported) await Linking.openURL(phoneUrl);
+        else Alert.alert("Greška", "Pozivi nisu podržani na ovom uređaju");
       } catch {
         Alert.alert("Greška", "Nije moguće pokrenuti poziv");
       }
@@ -93,90 +89,14 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 
     const url =
       vehicle.willhabenUrl ||
-      `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace("wh-", "")}`;
+      `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace(
+        "wh-",
+        ""
+      )}`;
     try {
       await WebBrowser.openBrowserAsync(url);
     } catch {
       Alert.alert("Error", "Could not open Willhaben");
-    }
-  };
-
-  const handleSearchSeller = async () => {
-    console.log("VEHICLE:", vehicle);
-
-    // ===== RADIO MODE – POZIV =====
-    if (isRadioModeOn && hasPhone && vehicle.phone) {
-      try {
-        const phoneUrl = `tel:${vehicle.phone}`;
-        const supported = await Linking.canOpenURL(phoneUrl);
-        if (supported) await Linking.openURL(phoneUrl);
-      } catch {
-        Alert.alert("Fehler", "Anruf konnte nicht gestartet werden");
-      }
-      return;
-    }
-
-    // ===== IME PRODAVCA =====
-    let fullName = vehicle.sellerName?.trim() || "";
-
-    // Ako nema imena – pokušaj dohvatiti sa oglasa
-    if (!fullName && vehicle.willhabenUrl) {
-      try {
-        const response = await fetch(vehicle.willhabenUrl);
-        const html = await response.text();
-
-        const patterns = [
-          /data-testid=["']bottom-contact-box-seller-name["'][\s\S]*?<font[^>]*>\s*<font[^>]*>\s*([^<]+)\s*<\/font>/i,
-          /"contactName"\s*:\s*"([^"]+)"/i,
-        ];
-
-        for (const p of patterns) {
-          const m = html.match(p);
-          if (m) {
-            fullName = m[1].trim();
-            break;
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch seller name:", err);
-      }
-    }
-
-    // ===== GRAD + POŠTANSKI BROJ =====
-    let city = vehicle.location || "";
-    let postcode = vehicle.postcode || "";
-
-    // Fallback: ako backend nije poslao postcode
-    if (!postcode && city) {
-      const match = city.match(/^(\d{4})\s*(.*)/);
-      if (match) {
-        postcode = match[1];
-        city = match[2];
-      }
-    }
-
-    // ===== CLIPBOARD (OPCIONALNO) =====
-    const clipboardText =
-      `${fullName || ""}` +
-      `${postcode ? ", " + postcode : ""}` +
-      `${city ? " " + city : ""}`;
-
-    try {
-      await Clipboard.setStringAsync(clipboardText);
-    } catch {}
-
-    // ===== DASSCHNELLE – AUTO POPUNJENA PRETRAGA =====
-    const dasSchnelleUrl =
-      `https://www.dasschnelle.at/ergebnisse` +
-      `?what=${encodeURIComponent(fullName || "")}` +
-      `&where=${encodeURIComponent(
-        `${postcode ? postcode + " " : ""}${city || "Österreich"}`
-      )}`;
-
-    try {
-      await WebBrowser.openBrowserAsync(dasSchnelleUrl);
-    } catch {
-      Alert.alert("Fehler", "Die Suche konnte nicht geöffnet werden");
     }
   };
 
@@ -188,7 +108,10 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
 
     const url =
       vehicle.willhabenUrl ||
-      `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace("wh-", "")}`;
+      `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace(
+        "wh-",
+        ""
+      )}`;
 
     try {
       await Clipboard.setStringAsync(messageTemplate);
@@ -216,20 +139,18 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
     if (!mileage) return "";
     return new Intl.NumberFormat("de-AT").format(mileage) + " km";
   };
+
   const getMetadata = () => {
     const parts = [];
     if (vehicle.year) parts.push(vehicle.year.toString());
     if (vehicle.mileage) parts.push(formatMileage(vehicle.mileage));
     if (vehicle.fuelType) parts.push(vehicle.fuelType);
-
-    // Dodaj lokaciju + poštanski broj
     if (vehicle.location) {
       const loc = vehicle.postcode
         ? `${vehicle.postcode} ${vehicle.location}`
         : vehicle.location;
       parts.push(loc);
     }
-
     return parts.join(" • ");
   };
 
@@ -246,7 +167,9 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
         },
         animatedStyle,
       ]}
-      accessibilityLabel={`${vehicle.title}, ${vehicle.year || "Jahr unbekannt"}, ${formatPrice(vehicle.price)}`}
+      accessibilityLabel={`${vehicle.title}, ${
+        vehicle.year || "Jahr unbekannt"
+      }, ${formatPrice(vehicle.price)}`}
     >
       <TouchableOpacity
         onPress={handleImagePress}
@@ -261,12 +184,12 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           contentFit="cover"
           transition={200}
         />
-        {isNew ? (
+        {isNew && (
           <View style={[styles.newBadge, { backgroundColor: colors.primary }]}>
             <ThemedText style={styles.newBadgeText}>NEU</ThemedText>
           </View>
-        ) : null}
-        {hasPhone ? (
+        )}
+        {hasPhone && (
           <View
             style={[
               styles.phoneBadge,
@@ -275,7 +198,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           >
             <Ionicons name="call" size={16} color="#FFFFFF" />
           </View>
-        ) : null}
+        )}
       </TouchableOpacity>
 
       <View style={styles.contentContainer}>
@@ -293,7 +216,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
             >
               {vehicle.title}
             </ThemedText>
-            {hasPhone ? (
+            {hasPhone && (
               <View
                 style={[
                   styles.phoneTag,
@@ -303,7 +226,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
                 <Ionicons name="call" size={14} color="#FFFFFF" />
                 <ThemedText style={styles.phoneTagText}>TEL</ThemedText>
               </View>
-            ) : null}
+            )}
           </View>
 
           <ThemedText
@@ -327,27 +250,8 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
             <ThemedText style={styles.buttonText}>Pošalji poruku</ThemedText>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleSearchSeller}
-            activeOpacity={0.6}
-            style={[
-              styles.actionButton,
-              {
-                backgroundColor:
-                  isRadioModeOn && hasPhone ? "#22C55E" : "#6366F1",
-              },
-            ]}
-          >
-            <Ionicons
-              name={isRadioModeOn && hasPhone ? "call" : "search"}
-              size={16}
-              color="#FFFFFF"
-            />
-            <ThemedText style={styles.buttonText}>Potraži broj</ThemedText>
-            {isRadioModeOn && hasPhone ? (
-              <View style={styles.greenDot} />
-            ) : null}
-          </TouchableOpacity>
+          {/* NOVO: DassSchnelleSearch komponenta */}
+          <DassSchnelleSearch vehicle={vehicle} />
         </View>
       </View>
     </AnimatedView>
