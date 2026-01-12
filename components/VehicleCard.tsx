@@ -116,7 +116,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       return;
     }
 
-    // ===== IME PRODAAVCA =====
+    // ===== IME PRODAVCA =====
     let fullName = vehicle.sellerName?.trim() || "";
 
     // Ako nema imena – pokušaj dohvatiti sa oglasa
@@ -142,29 +142,36 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       }
     }
 
-    // ===== GRAD + POŠTANSKI BROJ (ISPRAVNO) =====
-    const city = vehicle.location || "";
-    const postcode = vehicle.postcode || "";
+    // ===== GRAD + POŠTANSKI BROJ =====
+    let city = vehicle.location || "";
+    let postcode = vehicle.postcode || "";
 
-    // ===== TEKST ZA CLIPBOARD =====
+    // Fallback: ako backend nije poslao postcode
+    if (!postcode && city) {
+      const match = city.match(/^(\d{4})\s*(.*)/);
+      if (match) {
+        postcode = match[1];
+        city = match[2];
+      }
+    }
+
+    // ===== CLIPBOARD (OPCIONALNO) =====
     const clipboardText =
-      // `${fullName || ""}` +
-      `${postcode ? ", " + postcode : ""}` + `${city ? " " + city : ""}`;
+      `${fullName || ""}` +
+      `${postcode ? ", " + postcode : ""}` +
+      `${city ? " " + city : ""}`;
 
     try {
       await Clipboard.setStringAsync(clipboardText);
-      Alert.alert("Kopirano u clipboard", clipboardText);
-    } catch (err) {
-      console.error("Clipboard error:", err);
-    }
+    } catch {}
 
-    // ===== DASSCHNELLE PRETRAGA =====
-    const searchQuery = encodeURIComponent(fullName || "");
-    const locationQuery = encodeURIComponent(
-      `${postcode ? postcode + " " : ""}${city || "Österreich"}`
-    );
-
-    const dasSchnelleUrl = `https://www.dasschnelle.at/ergebnisse?what=${searchQuery}&where=${locationQuery}`;
+    // ===== DASSCHNELLE – AUTO POPUNJENA PRETRAGA =====
+    const dasSchnelleUrl =
+      `https://www.dasschnelle.at/ergebnisse` +
+      `?what=${encodeURIComponent(fullName || "")}` +
+      `&where=${encodeURIComponent(
+        `${postcode ? postcode + " " : ""}${city || "Österreich"}`
+      )}`;
 
     try {
       await WebBrowser.openBrowserAsync(dasSchnelleUrl);
