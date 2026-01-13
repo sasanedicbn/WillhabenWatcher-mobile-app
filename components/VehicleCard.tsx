@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Modal, Alert } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  Alert,
+  Platform,
+} from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
