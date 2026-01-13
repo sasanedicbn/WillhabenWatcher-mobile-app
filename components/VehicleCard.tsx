@@ -1,16 +1,7 @@
-import React from "react";
-import {
-  View,
-  StyleSheet,
-  Alert,
-  Platform,
-  TouchableOpacity,
-} from "react-native";
+import React, { useState } from "react";
+import { View, StyleSheet, TouchableOpacity, Modal, Alert } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import * as Linking from "expo-linking";
-import * as WebBrowser from "expo-web-browser";
-import * as Clipboard from "expo-clipboard";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -25,6 +16,7 @@ import { useRadioMode } from "@/context/RadioModeContext";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { Vehicle } from "@/services/api";
 import { DassSchnelleSearch } from "./DasSchneleSearcher";
+import { WebView } from "react-native-webview";
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -47,6 +39,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const scale = useSharedValue(1);
   const colors = isDark ? Colors.dark : Colors.light;
   const hasPhone = Boolean(vehicle.phone);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -66,7 +59,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
     );
     const googleUrl = `https://www.google.com/search?q=${searchQuery}`;
     try {
-      await WebBrowser.openBrowserAsync(googleUrl);
+      await Linking.openURL(googleUrl);
     } catch {
       Alert.alert("Error", "Could not open browser");
     }
@@ -94,37 +87,49 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
         ""
       )}`;
     try {
-      await WebBrowser.openBrowserAsync(url);
+      await Linking.openURL(url);
     } catch {
       Alert.alert("Error", "Could not open Willhaben");
     }
   };
 
-  const handleMessagePress = async () => {
+  const handleMessagePress = () => {
     setCurrentPhone(vehicle.phone || null);
-    const messageTemplate = `Hallöchen 🥰🥰🥰 haben Sie kurz Zeit für ein Telefonat? Er gefällt mir und der Preis passt mir auch.
+    setModalVisible(true);
+  };
+
+  const messageTemplate = `Hallöchen 🥰🥰🥰 haben Sie kurz Zeit für ein Telefonat? 
+Er gefällt mir und der Preis passt mir auch.
 Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
 06643972640`;
 
-    const url =
-      vehicle.willhabenUrl ||
-      `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace(
-        "wh-",
-        ""
-      )}`;
+  const willhabenUrl =
+    vehicle.willhabenUrl ||
+    `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace(
+      "wh-",
+      ""
+    )}`;
 
-    try {
-      await Clipboard.setStringAsync(messageTemplate);
-    } catch (error) {
-      console.error("Clipboard error:", error);
-    }
-
-    try {
-      await WebBrowser.openBrowserAsync(url);
-    } catch {
-      Alert.alert("Greška", "Nije moguće otvoriti Willhaben");
-    }
-  };
+  const injectedJS = `
+    (function () {
+      const MESSAGE = ${JSON.stringify(messageTemplate)};
+      function fill() {
+        const textarea = document.querySelector('#mailContent');
+        if (!textarea) return false;
+        textarea.focus();
+        textarea.value = MESSAGE;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }
+      let tries = 0;
+      const interval = setInterval(() => {
+        tries++;
+        if (fill() || tries > 10) clearInterval(interval);
+      }, 500);
+    })();
+    true;
+  `;
 
   const formatPrice = (price: number | null) => {
     if (!price) return "Preis auf Anfrage";
@@ -157,104 +162,127 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
   const placeholderImage = "https://via.placeholder.com/200x200.png?text=Auto";
 
   return (
-    <AnimatedView
-      style={[
-        styles.card,
-        {
-          backgroundColor: colors.backgroundDefault,
-          borderColor: isNew ? colors.primary : colors.border,
-          borderWidth: isNew ? 2 : 1,
-        },
-        animatedStyle,
-      ]}
-      accessibilityLabel={`${vehicle.title}, ${
-        vehicle.year || "Jahr unbekannt"
-      }, ${formatPrice(vehicle.price)}`}
-    >
-      <TouchableOpacity
-        onPress={handleImagePress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={0.8}
-        style={styles.imageContainer}
+    <>
+      <AnimatedView
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.backgroundDefault,
+            borderColor: isNew ? colors.primary : colors.border,
+            borderWidth: isNew ? 2 : 1,
+          },
+          animatedStyle,
+        ]}
       >
-        <Image
-          source={{ uri: vehicle.imageUrl || placeholderImage }}
-          style={styles.image}
-          contentFit="cover"
-          transition={200}
-        />
-        {isNew && (
-          <View style={[styles.newBadge, { backgroundColor: colors.primary }]}>
-            <ThemedText style={styles.newBadgeText}>NEU</ThemedText>
-          </View>
-        )}
-        {hasPhone && (
-          <View
-            style={[
-              styles.phoneBadge,
-              { backgroundColor: isRadioModeOn ? "#22C55E" : "#6B7280" },
-            ]}
-          >
-            <Ionicons name="call" size={16} color="#FFFFFF" />
-          </View>
-        )}
-      </TouchableOpacity>
-
-      <View style={styles.contentContainer}>
         <TouchableOpacity
-          onPress={handleCardPress}
+          onPress={handleImagePress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          activeOpacity={0.9}
-          style={styles.textContent}
+          activeOpacity={0.8}
+          style={styles.imageContainer}
         >
-          <View style={styles.titleRow}>
-            <ThemedText
-              style={[styles.title, { color: colors.text, flex: 1 }]}
-              numberOfLines={2}
+          <Image
+            source={{ uri: vehicle.imageUrl || placeholderImage }}
+            style={styles.image}
+            contentFit="cover"
+            transition={200}
+          />
+          {isNew && (
+            <View
+              style={[styles.newBadge, { backgroundColor: colors.primary }]}
             >
-              {vehicle.title}
-            </ThemedText>
-            {hasPhone && (
-              <View
-                style={[
-                  styles.phoneTag,
-                  { backgroundColor: isRadioModeOn ? "#22C55E" : "#3B82F6" },
-                ]}
-              >
-                <Ionicons name="call" size={14} color="#FFFFFF" />
-                <ThemedText style={styles.phoneTagText}>TEL</ThemedText>
-              </View>
-            )}
-          </View>
-
-          <ThemedText
-            style={[styles.metadata, { color: colors.textSecondary }]}
-          >
-            {getMetadata()}
-          </ThemedText>
-
-          <ThemedText style={[styles.price, { color: colors.primary }]}>
-            {formatPrice(vehicle.price)}
-          </ThemedText>
+              <ThemedText style={styles.newBadgeText}>NEU</ThemedText>
+            </View>
+          )}
+          {hasPhone && (
+            <View
+              style={[
+                styles.phoneBadge,
+                { backgroundColor: isRadioModeOn ? "#22C55E" : "#6B7280" },
+              ]}
+            >
+              <Ionicons name="call" size={16} color="#FFFFFF" />
+            </View>
+          )}
         </TouchableOpacity>
 
-        <View style={styles.buttonColumn}>
+        <View style={styles.contentContainer}>
           <TouchableOpacity
-            onPress={handleMessagePress}
-            activeOpacity={0.6}
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            onPress={handleCardPress}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            activeOpacity={0.9}
+            style={styles.textContent}
           >
-            <Ionicons name="mail-outline" size={16} color="#FFFFFF" />
-            <ThemedText style={styles.buttonText}>Pošalji poruku</ThemedText>
+            <View style={styles.titleRow}>
+              <ThemedText
+                style={[styles.title, { color: colors.text, flex: 1 }]}
+                numberOfLines={2}
+              >
+                {vehicle.title}
+              </ThemedText>
+              {hasPhone && (
+                <View
+                  style={[
+                    styles.phoneTag,
+                    { backgroundColor: isRadioModeOn ? "#22C55E" : "#3B82F6" },
+                  ]}
+                >
+                  <Ionicons name="call" size={14} color="#FFFFFF" />
+                  <ThemedText style={styles.phoneTagText}>TEL</ThemedText>
+                </View>
+              )}
+            </View>
+
+            <ThemedText
+              style={[styles.metadata, { color: colors.textSecondary }]}
+            >
+              {getMetadata()}
+            </ThemedText>
+
+            <ThemedText style={[styles.price, { color: colors.primary }]}>
+              {formatPrice(vehicle.price)}
+            </ThemedText>
           </TouchableOpacity>
 
-          {/* NOVO: DassSchnelleSearch komponenta */}
-          <DassSchnelleSearch vehicle={vehicle} />
+          <View style={styles.buttonColumn}>
+            <TouchableOpacity
+              onPress={handleMessagePress}
+              activeOpacity={0.6}
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            >
+              <Ionicons name="mail-outline" size={16} color="#FFFFFF" />
+              <ThemedText style={styles.buttonText}>Pošalji poruku</ThemedText>
+            </TouchableOpacity>
+
+            {/* NOVO: DassSchnelleSearch komponenta */}
+            <DassSchnelleSearch vehicle={vehicle} />
+          </View>
         </View>
-      </View>
-    </AnimatedView>
+      </AnimatedView>
+
+      {/* Modal sa WebView */}
+      <Modal visible={modalVisible} animationType="slide">
+        <View style={{ flex: 1 }}>
+          <TouchableOpacity
+            onPress={() => setModalVisible(false)}
+            style={{ padding: 16, backgroundColor: colors.backgroundDefault }}
+          >
+            <ThemedText>Zatvori</ThemedText>
+          </TouchableOpacity>
+
+          <WebView
+            source={{ uri: willhabenUrl }}
+            injectedJavaScript={injectedJS}
+            javaScriptEnabled
+            domStorageEnabled
+            sharedCookiesEnabled
+            thirdPartyCookiesEnabled
+            style={{ flex: 1 }}
+          />
+        </View>
+      </Modal>
+    </>
   );
 }
 
