@@ -24,7 +24,7 @@ import { usePhone } from "@/context/PhoneContext";
 import { useRadioMode } from "@/context/RadioModeContext";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { Vehicle } from "@/services/api";
-import { DassSchnelleSearch } from "./DassSchnelleSearch";
+import { DassSchnelleSearch } from "./DasSchneleSearcher";
 
 interface VehicleCardProps {
   vehicle: Vehicle;

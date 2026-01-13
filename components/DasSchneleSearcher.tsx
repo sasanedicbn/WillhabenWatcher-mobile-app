@@ -8,27 +8,43 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
   const fullName = vehicle.sellerName?.trim() || "Max Mustermann";
   const postcode = vehicle.postcode || "";
   const city = vehicle.location || "";
-
-  const searchLocation = `${postcode ? postcode + " " : ""}${city}`;
+  const location = `${postcode ? postcode + " " : ""}${city}`.trim();
 
   const injectedJS = `
-    const whatInput = document.querySelector('#what');
-    const whereInput = document.querySelector('#where');
-    const searchButton = document.querySelector('button[type="submit"]');
+    (function () {
+      const tryFill = () => {
+        const what = document.querySelector('input[name="what"], #what');
+        const where = document.querySelector('input[name="where"], #where');
+        const button = document.querySelector('button[type="submit"]');
 
-    if (whatInput && whereInput && searchButton) {
-      whatInput.value = '${fullName}';
-      whereInput.value = '${searchLocation}';
-      searchButton.click();
-    }
-    true; // mora za React Native WebView
+        if (what && where) {
+          what.focus();
+          what.value = '${fullName}';
+          what.dispatchEvent(new Event('input', { bubbles: true }));
+
+          where.focus();
+          where.value = '${location}';
+          where.dispatchEvent(new Event('input', { bubbles: true }));
+
+          if (button) button.click();
+          return true;
+        }
+        return false;
+      };
+
+      const interval = setInterval(() => {
+        if (tryFill()) clearInterval(interval);
+      }, 300);
+    })();
+    true;
   `;
 
-  const handleOpen = () => setModalVisible(true);
-
   return (
-    <View style={{ flex: 1 }}>
-      <TouchableOpacity onPress={handleOpen} style={styles.button}>
+    <View>
+      <TouchableOpacity
+        onPress={() => setModalVisible(true)}
+        style={styles.button}
+      >
         <Text style={styles.buttonText}>Pretraži prodavca</Text>
       </TouchableOpacity>
 
@@ -56,13 +72,19 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
-    margin: 16,
+    margin: 12,
   },
-  buttonText: { color: "#fff", fontWeight: "bold" },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
   closeButton: {
     backgroundColor: "#ef4444",
     padding: 12,
     alignItems: "center",
   },
-  closeText: { color: "#fff", fontWeight: "bold" },
+  closeText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
 });
