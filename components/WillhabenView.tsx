@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Modal,
@@ -9,40 +9,34 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import * as Clipboard from "expo-clipboard";
-import { Platform } from "react-native";
 
 interface WillhabenWebViewProps {
   url: string;
   messageTemplate: string;
 }
 
-export const WillhabenWebView: React.FC<WillhabenWebViewProps> = ({
+export function WillhabenWebView({
   url,
   messageTemplate,
-}) => {
+}: WillhabenWebViewProps) {
   const [visible, setVisible] = useState(true);
 
-  // ✅ KOPIRANJE PORUKE U CLIPBOARD ODMAH
+  // ✅ Kopiraj poruku (radi iako se ne vidi)
   useEffect(() => {
-    if (messageTemplate) {
-      Clipboard.setStringAsync(messageTemplate);
-    }
+    Clipboard.setStringAsync(messageTemplate);
   }, [messageTemplate]);
 
-  // ANDROID BACK BUTTON
+  // ✅ Android back → zatvori modal
   useEffect(() => {
     const backAction = () => {
-      if (visible) {
-        setVisible(false);
-        return true;
-      }
-      return false;
+      setVisible(false);
+      return true;
     };
 
     BackHandler.addEventListener("hardwareBackPress", backAction);
     return () =>
       BackHandler.removeEventListener("hardwareBackPress", backAction);
-  }, [visible]);
+  }, []);
 
   const injectedJS = `
     (function () {
@@ -65,46 +59,38 @@ export const WillhabenWebView: React.FC<WillhabenWebViewProps> = ({
   `;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={() => setVisible(false)}
-    >
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setVisible(false)}>
-            <Text style={styles.backText}>← Nazad</Text>
-          </TouchableOpacity>
-        </View>
-
+    <Modal visible={visible} animationType="slide">
+      <View style={{ flex: 1 }}>
+        {/* WEBVIEW */}
         <WebView
           source={{ uri: url }}
           injectedJavaScript={injectedJS}
           javaScriptEnabled
           domStorageEnabled
+          style={{ flex: 1 }}
         />
+
+        {/* ISTO KAO DASS SCHNELLE */}
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={() => setVisible(false)}
+        >
+          <Text style={styles.closeText}>Zatvori</Text>
+        </TouchableOpacity>
       </View>
     </Modal>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
+  closeButton: {
+    backgroundColor: "#ef4444",
+    padding: 14,
+    alignItems: "center",
   },
-  header: {
-    height: Platform.OS === "ios" ? 90 : 60,
-    paddingTop: Platform.OS === "ios" ? 40 : 0,
-    paddingHorizontal: 16,
-    justifyContent: "center",
-    borderBottomWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
-  },
-  backText: {
-    fontSize: 16,
+  closeText: {
+    color: "#fff",
     fontWeight: "700",
-    color: "#ef4444",
+    fontSize: 16,
   },
 });
