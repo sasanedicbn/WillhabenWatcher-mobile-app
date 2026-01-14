@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import * as Clipboard from "expo-clipboard";
+import { Platform } from "react-native";
 
 interface WillhabenWebViewProps {
   url: string;
@@ -23,8 +24,10 @@ export const WillhabenWebView: React.FC<WillhabenWebViewProps> = ({
 
   // ✅ KOPIRANJE PORUKE U CLIPBOARD ODMAH
   useEffect(() => {
-    Clipboard.setStringAsync(messageTemplate);
-  }, []);
+    if (messageTemplate) {
+      Clipboard.setStringAsync(messageTemplate);
+    }
+  }, [messageTemplate]);
 
   // ANDROID BACK BUTTON
   useEffect(() => {
