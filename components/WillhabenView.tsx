@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Modal,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   SafeAreaView,
+  BackHandler,
 } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -21,6 +22,21 @@ export const WillhabenWebView: React.FC<WillhabenWebViewProps> = ({
 }) => {
   const [modalVisible, setModalVisible] = useState(true);
   const webViewRef = useRef<WebView>(null);
+
+  // Presretanje Android back button-a
+  useEffect(() => {
+    const onBackPress = () => {
+      if (modalVisible) {
+        setModalVisible(false);
+        return true; // presretanje default back behavior-a
+      }
+      return false; // default behavior ako modal nije otvoren
+    };
+
+    BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () =>
+      BackHandler.removeEventListener("hardwareBackPress", onBackPress);
+  }, [modalVisible]);
 
   const injectedJS = `
     (function () {
