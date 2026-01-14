@@ -144,7 +144,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
       const interval = setInterval(() => {
         i++;
         if (fill() || i > 10) clearInterval(interval);
-      }, 500);
+      }, 700);
     })();
     true;
   `;
