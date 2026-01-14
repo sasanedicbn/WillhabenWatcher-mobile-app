@@ -11,46 +11,30 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
   const city = vehicle.location || "";
   const location = `${postcode ? postcode + " " : ""}${city}`.trim();
 
-  const injectedJS = `
+  // JS koji se injektuje ali se **ne pokreće odmah** – pokreće se kad korisnik klikne "Pretraži"
+  const injectedJS = (runSearch: boolean) => `
     (function () {
-      if (window.__DASS_DONE__) return;
-      window.__DASS_DONE__ = true;
+      if (!${runSearch}) return;
 
-      let attempts = 0;
+      const what = document.querySelector('input[name="what"], #what');
+      const where = document.querySelector('input[name="where"], #where');
+      const button = document.querySelector('button[type="submit"]');
 
-      function tryFill() {
-        const what = document.querySelector('input[name="what"], #what');
-        const where = document.querySelector('input[name="where"], #where');
-        const button = document.querySelector('button[type="submit"]');
+      if (what && where && button) {
+        what.value = ${JSON.stringify(fullName)};
+        what.dispatchEvent(new Event('input', { bubbles: true }));
 
-        if (what && where && button) {
-          what.value = ${JSON.stringify(fullName)};
-          what.dispatchEvent(new Event('input', { bubbles: true }));
+        where.value = ${JSON.stringify(location)};
+        where.dispatchEvent(new Event('input', { bubbles: true }));
 
-          where.value = ${JSON.stringify(location)};
-          where.dispatchEvent(new Event('input', { bubbles: true }));
-
-          setTimeout(() => {
-            button.click();
-          }, 300);
-
-          return true;
-        }
-        return false;
+        button.scrollIntoView({behavior:'smooth', block:'center'});
+        setTimeout(() => button.click(), 300);
       }
-
-      function retry() {
-        attempts++;
-        if (attempts > 8) return;
-        if (!tryFill()) {
-          setTimeout(retry, 400);
-        }
-      }
-
-      retry();
     })();
     true;
   `;
+
+  const [runSearch, setRunSearch] = useState(false);
 
   return (
     <View>
@@ -68,16 +52,29 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
           javaScriptEnabled
           domStorageEnabled
           onLoadEnd={() => {
-            webViewRef.current?.injectJavaScript(injectedJS);
+            if (runSearch)
+              webViewRef.current?.injectJavaScript(injectedJS(true));
           }}
         />
 
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={() => setModalVisible(false)}
-        >
-          <Text style={styles.closeText}>Zatvori</Text>
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => {
+              setRunSearch(true);
+              webViewRef.current?.injectJavaScript(injectedJS(true));
+            }}
+          >
+            <Text style={styles.buttonText}>Pokreni pretragu</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setModalVisible(false)}
+          >
+            <Text style={styles.closeText}>Zatvori</Text>
+          </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );
@@ -99,9 +96,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#ef4444",
     padding: 12,
     alignItems: "center",
+    marginTop: 8,
   },
   closeText: {
     color: "#fff",
     fontWeight: "700",
+  },
+  actions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    padding: 12,
+  },
+  searchButton: {
+    backgroundColor: "#10B981",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
   },
 });
