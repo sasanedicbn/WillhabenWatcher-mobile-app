@@ -11,30 +11,31 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
   const city = vehicle.location || "";
   const location = `${postcode ? postcode + " " : ""}${city}`.trim();
 
-  // JS koji se injektuje ali se **ne pokreće odmah** – pokreće se kad korisnik klikne "Pretraži"
-  const injectedJS = (runSearch: boolean) => `
+  // Skripta koja se izvršava samo jednom
+  const injectedJS = `
     (function () {
-      if (!${runSearch}) return;
+      if (window.__DASS_DONE__) return;
+      window.__DASS_DONE__ = true;
 
       const what = document.querySelector('input[name="what"], #what');
       const where = document.querySelector('input[name="where"], #where');
       const button = document.querySelector('button[type="submit"]');
 
-      if (what && where && button) {
+      if (what && where) {
+        what.focus();
         what.value = ${JSON.stringify(fullName)};
         what.dispatchEvent(new Event('input', { bubbles: true }));
 
+        where.focus();
         where.value = ${JSON.stringify(location)};
         where.dispatchEvent(new Event('input', { bubbles: true }));
 
-        button.scrollIntoView({behavior:'smooth', block:'center'});
-        setTimeout(() => button.click(), 300);
+        // ne klikamo odmah submita da se ne pretražuje automatski
+        // button.click(); // ako želiš da odmah klikne search, možeš otkomentirati
       }
     })();
     true;
   `;
-
-  const [runSearch, setRunSearch] = useState(false);
 
   return (
     <View>
@@ -52,29 +53,16 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
           javaScriptEnabled
           domStorageEnabled
           onLoadEnd={() => {
-            if (runSearch)
-              webViewRef.current?.injectJavaScript(injectedJS(true));
+            webViewRef.current?.injectJavaScript(injectedJS);
           }}
         />
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.searchButton}
-            onPress={() => {
-              setRunSearch(true);
-              webViewRef.current?.injectJavaScript(injectedJS(true));
-            }}
-          >
-            <Text style={styles.buttonText}>Pokreni pretragu</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setModalVisible(false)}
-          >
-            <Text style={styles.closeText}>Zatvori</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={() => setModalVisible(false)}
+        >
+          <Text style={styles.closeText}>Zatvori</Text>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -96,21 +84,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#ef4444",
     padding: 12,
     alignItems: "center",
-    marginTop: 8,
   },
   closeText: {
     color: "#fff",
     fontWeight: "700",
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    padding: 12,
-  },
-  searchButton: {
-    backgroundColor: "#10B981",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
   },
 });

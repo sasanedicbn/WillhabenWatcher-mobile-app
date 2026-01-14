@@ -1,5 +1,12 @@
 import React, { useState, useRef } from "react";
-import { View, Modal, TouchableOpacity, Text, StyleSheet } from "react-native";
+import {
+  View,
+  Modal,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Platform,
+} from "react-native";
 import { WebView } from "react-native-webview";
 
 interface WillhabenWebViewProps {
@@ -46,34 +53,42 @@ export const WillhabenWebView: React.FC<WillhabenWebViewProps> = ({
 
   return (
     <Modal visible={modalVisible} animationType="slide">
-      <WebView
-        ref={webViewRef}
-        source={{ uri: url }}
-        injectedJavaScript={injectedJS}
-        javaScriptEnabled
-        domStorageEnabled
-      />
+      <View style={{ flex: 1 }}>
+        <WebView
+          ref={webViewRef}
+          source={{ uri: url }}
+          injectedJavaScript={injectedJS}
+          javaScriptEnabled
+          domStorageEnabled
+          style={{ flex: 1 }}
+        />
 
-      <TouchableOpacity
-        style={styles.closeButton}
-        onPress={() => setModalVisible(false)}
-      >
-        <Text style={styles.closeText}>Zatvori</Text>
-      </TouchableOpacity>
+        {/* APPSKI BACK / CLOSE BUTTON */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setModalVisible(false)}
+        >
+          <Text style={styles.backButtonText}>Nazad</Text>
+        </TouchableOpacity>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  closeButton: {
+  backButton: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 50 : 20, // malo više na iOS zbog notch
+    right: 20,
     backgroundColor: "#ef4444",
-    padding: 12,
-    alignItems: "center",
-    margin: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 8,
+    zIndex: 999, // da bude iznad WebView
   },
-  closeText: {
+  backButtonText: {
     color: "#fff",
     fontWeight: "700",
+    fontSize: 14,
   },
 });
