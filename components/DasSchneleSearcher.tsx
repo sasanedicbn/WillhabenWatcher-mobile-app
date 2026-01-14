@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { View, Modal, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { WebView } from "react-native-webview";
 
 export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
   const [modalVisible, setModalVisible] = useState(false);
+  const webViewRef = useRef<WebView>(null);
 
   const fullName = vehicle.sellerName?.trim() || "Max Mustermann";
   const postcode = vehicle.postcode || "";
@@ -12,29 +13,41 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
 
   const injectedJS = `
     (function () {
-      const tryFill = () => {
+      if (window.__DASS_DONE__) return;
+      window.__DASS_DONE__ = true;
+
+      let attempts = 0;
+
+      function tryFill() {
         const what = document.querySelector('input[name="what"], #what');
         const where = document.querySelector('input[name="where"], #where');
         const button = document.querySelector('button[type="submit"]');
 
-        if (what && where) {
-          what.focus();
-          what.value = '${fullName}';
+        if (what && where && button) {
+          what.value = ${JSON.stringify(fullName)};
           what.dispatchEvent(new Event('input', { bubbles: true }));
 
-          where.focus();
-          where.value = '${location}';
+          where.value = ${JSON.stringify(location)};
           where.dispatchEvent(new Event('input', { bubbles: true }));
 
-          if (button) button.click();
+          setTimeout(() => {
+            button.click();
+          }, 300);
+
           return true;
         }
         return false;
-      };
+      }
 
-      const interval = setInterval(() => {
-        if (tryFill()) clearInterval(interval);
-      }, 300);
+      function retry() {
+        attempts++;
+        if (attempts > 8) return;
+        if (!tryFill()) {
+          setTimeout(retry, 400);
+        }
+      }
+
+      retry();
     })();
     true;
   `;
@@ -50,11 +63,15 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
 
       <Modal visible={modalVisible} animationType="slide">
         <WebView
+          ref={webViewRef}
           source={{ uri: "https://www.dasschnelle.at/" }}
-          injectedJavaScript={injectedJS}
           javaScriptEnabled
           domStorageEnabled
+          onLoadEnd={() => {
+            webViewRef.current?.injectJavaScript(injectedJS);
+          }}
         />
+
         <TouchableOpacity
           style={styles.closeButton}
           onPress={() => setModalVisible(false)}

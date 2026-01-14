@@ -9,12 +9,15 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   WithSpringConfig,
 } from "react-native-reanimated";
+import { WebView } from "react-native-webview";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
@@ -23,7 +26,6 @@ import { useRadioMode } from "@/context/RadioModeContext";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { Vehicle } from "@/services/api";
 import { DassSchnelleSearch } from "./DasSchneleSearcher";
-import { WebView } from "react-native-webview";
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -43,8 +45,9 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const { isRadioModeOn } = useRadioMode();
-  const scale = useSharedValue(1);
   const colors = isDark ? Colors.dark : Colors.light;
+
+  const scale = useSharedValue(1);
   const hasPhone = Boolean(vehicle.phone);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -60,18 +63,25 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
     scale.value = withSpring(1, springConfig);
   };
 
+  /* =========================
+     GOOGLE SEARCH (SLIKA)
+  ========================= */
   const handleImagePress = async () => {
-    const searchQuery = encodeURIComponent(
+    const query = encodeURIComponent(
       `${vehicle.title} ${vehicle.location} telefon kontakt`
     );
-    const googleUrl = `https://www.google.com/search?q=${searchQuery}`;
+    const googleUrl = `https://www.google.com/search?q=${query}`;
+
     try {
-      await Linking.openURL(googleUrl);
+      await WebBrowser.openBrowserAsync(googleUrl);
     } catch {
-      Alert.alert("Error", "Could not open browser");
+      Alert.alert("Greška", "Ne mogu otvoriti Google pretragu");
     }
   };
 
+  /* =========================
+     WILLHABEN / POZIV (NASLOV)
+  ========================= */
   const handleCardPress = async () => {
     setCurrentPhone(vehicle.phone || null);
 
@@ -79,12 +89,11 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       try {
         const phoneUrl = `tel:${vehicle.phone}`;
         const supported = await Linking.canOpenURL(phoneUrl);
-        if (supported) await Linking.openURL(phoneUrl);
-        else Alert.alert("Greška", "Pozivi nisu podržani na ovom uređaju");
-      } catch {
-        Alert.alert("Greška", "Nije moguće pokrenuti poziv");
-      }
-      return;
+        if (supported) {
+          await Linking.openURL(phoneUrl);
+          return;
+        }
+      } catch {}
     }
 
     const url =
@@ -93,22 +102,25 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
         "wh-",
         ""
       )}`;
+
     try {
-      await Linking.openURL(url);
+      await WebBrowser.openBrowserAsync(url);
     } catch {
-      Alert.alert("Error", "Could not open Willhaben");
+      Alert.alert("Greška", "Ne mogu otvoriti Willhaben oglas");
     }
   };
 
+  /* =========================
+     PORUKA (WEBVIEW)
+  ========================= */
   const handleMessagePress = () => {
     setCurrentPhone(vehicle.phone || null);
     setModalVisible(true);
   };
 
-  const messageTemplate = `Hallöchen 🥰🥰🥰 haben Sie kurz Zeit für ein Telefonat? 
+  const messageTemplate = `Hallöchen 🥰🥰🥰 haben Sie kurz Zeit für ein Telefonat?
 Er gefällt mir und der Preis passt mir auch.
-Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
-06643972640`;
+Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.`;
 
   const willhabenUrl =
     vehicle.willhabenUrl ||
@@ -126,31 +138,28 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
         textarea.focus();
         textarea.value = MESSAGE;
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        textarea.dispatchEvent(new Event('change', { bubbles: true }));
         return true;
       }
-      let tries = 0;
+      let i = 0;
       const interval = setInterval(() => {
-        tries++;
-        if (fill() || tries > 10) clearInterval(interval);
+        i++;
+        if (fill() || i > 10) clearInterval(interval);
       }, 500);
     })();
     true;
   `;
 
-  const formatPrice = (price: number | null) => {
-    if (!price) return "Preis auf Anfrage";
-    return new Intl.NumberFormat("de-AT", {
-      style: "currency",
-      currency: "EUR",
-      maximumFractionDigits: 0,
-    }).format(price);
-  };
+  const formatPrice = (price: number | null) =>
+    price
+      ? new Intl.NumberFormat("de-AT", {
+          style: "currency",
+          currency: "EUR",
+          maximumFractionDigits: 0,
+        }).format(price)
+      : "Preis auf Anfrage";
 
-  const formatMileage = (mileage: number | null) => {
-    if (!mileage) return "";
-    return new Intl.NumberFormat("de-AT").format(mileage) + " km";
-  };
+  const formatMileage = (mileage: number | null) =>
+    mileage ? new Intl.NumberFormat("de-AT").format(mileage) + " km" : "";
 
   const getMetadata = () => {
     const parts = [];
@@ -158,10 +167,11 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
     if (vehicle.mileage) parts.push(formatMileage(vehicle.mileage));
     if (vehicle.fuelType) parts.push(vehicle.fuelType);
     if (vehicle.location) {
-      const loc = vehicle.postcode
-        ? `${vehicle.postcode} ${vehicle.location}`
-        : vehicle.location;
-      parts.push(loc);
+      parts.push(
+        vehicle.postcode
+          ? `${vehicle.postcode} ${vehicle.location}`
+          : vehicle.location
+      );
     }
     return parts.join(" • ");
   };
@@ -181,19 +191,20 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           animatedStyle,
         ]}
       >
+        {/* SLIKA */}
         <TouchableOpacity
           onPress={handleImagePress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
           style={styles.imageContainer}
         >
           <Image
             source={{ uri: vehicle.imageUrl || placeholderImage }}
             style={styles.image}
             contentFit="cover"
-            transition={200}
           />
+
           {isNew && (
             <View
               style={[styles.newBadge, { backgroundColor: colors.primary }]}
@@ -201,6 +212,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
               <ThemedText style={styles.newBadgeText}>NEU</ThemedText>
             </View>
           )}
+
           {hasPhone && (
             <View
               style={[
@@ -208,26 +220,23 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
                 { backgroundColor: isRadioModeOn ? "#22C55E" : "#6B7280" },
               ]}
             >
-              <Ionicons name="call" size={16} color="#FFFFFF" />
+              <Ionicons name="call" size={16} color="#FFF" />
             </View>
           )}
         </TouchableOpacity>
 
+        {/* TEKST */}
         <View style={styles.contentContainer}>
           <TouchableOpacity
             onPress={handleCardPress}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
             activeOpacity={0.9}
             style={styles.textContent}
           >
             <View style={styles.titleRow}>
-              <ThemedText
-                style={[styles.title, { color: colors.text, flex: 1 }]}
-                numberOfLines={2}
-              >
+              <ThemedText style={[styles.title, { color: colors.text }]}>
                 {vehicle.title}
               </ThemedText>
+
               {hasPhone && (
                 <View
                   style={[
@@ -235,7 +244,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
                     { backgroundColor: isRadioModeOn ? "#22C55E" : "#3B82F6" },
                   ]}
                 >
-                  <Ionicons name="call" size={14} color="#FFFFFF" />
+                  <Ionicons name="call" size={14} color="#FFF" />
                   <ThemedText style={styles.phoneTagText}>TEL</ThemedText>
                 </View>
               )}
@@ -255,39 +264,25 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
           <View style={styles.buttonColumn}>
             <TouchableOpacity
               onPress={handleMessagePress}
-              activeOpacity={0.6}
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
             >
-              <Ionicons name="mail-outline" size={16} color="#FFFFFF" />
+              <Ionicons name="mail-outline" size={16} color="#FFF" />
               <ThemedText style={styles.buttonText}>Pošalji poruku</ThemedText>
             </TouchableOpacity>
 
-            {/* NOVO: DassSchnelleSearch komponenta */}
             <DassSchnelleSearch vehicle={vehicle} />
           </View>
         </View>
       </AnimatedView>
 
-      {/* Modal sa WebView */}
+      {/* MODAL */}
       <Modal visible={modalVisible} animationType="slide">
-        <View style={{ flex: 1 }}>
-          <TouchableOpacity
-            onPress={() => setModalVisible(false)}
-            style={{ padding: 16, backgroundColor: colors.backgroundDefault }}
-          >
-            <ThemedText>Zatvori</ThemedText>
-          </TouchableOpacity>
-
-          <WebView
-            source={{ uri: willhabenUrl }}
-            injectedJavaScript={injectedJS}
-            javaScriptEnabled
-            domStorageEnabled
-            sharedCookiesEnabled
-            thirdPartyCookiesEnabled
-            style={{ flex: 1 }}
-          />
-        </View>
+        <WebView
+          source={{ uri: willhabenUrl }}
+          injectedJavaScript={injectedJS}
+          javaScriptEnabled
+          domStorageEnabled
+        />
       </Modal>
     </>
   );
