@@ -6,6 +6,7 @@ import {
   Text,
   StyleSheet,
   Platform,
+  SafeAreaView,
 } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -32,11 +33,9 @@ export const WillhabenWebView: React.FC<WillhabenWebViewProps> = ({
         textarea.focus();
         textarea.value = MESSAGE;
 
-        // trigger events da React vidi promjenu
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
         textarea.dispatchEvent(new Event('change', { bubbles: true }));
 
-        // scrollaj do textarea da bude vidljivo
         textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
         return true;
@@ -53,24 +52,26 @@ export const WillhabenWebView: React.FC<WillhabenWebViewProps> = ({
 
   return (
     <Modal visible={modalVisible} animationType="slide">
-      <View style={{ flex: 1 }}>
-        <WebView
-          ref={webViewRef}
-          source={{ uri: url }}
-          injectedJavaScript={injectedJS}
-          javaScriptEnabled
-          domStorageEnabled
-          style={{ flex: 1 }}
-        />
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+        <View style={{ flex: 1, position: "relative" }}>
+          <WebView
+            ref={webViewRef}
+            source={{ uri: url }}
+            injectedJavaScript={injectedJS}
+            javaScriptEnabled
+            domStorageEnabled
+            style={{ flex: 1 }}
+          />
 
-        {/* APPSKI BACK / CLOSE BUTTON */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => setModalVisible(false)}
-        >
-          <Text style={styles.backButtonText}>Nazad</Text>
-        </TouchableOpacity>
-      </View>
+          {/* Dugme za izlaz */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setModalVisible(false)}
+          >
+            <Text style={styles.backButtonText}>Nazad</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     </Modal>
   );
 };
@@ -78,13 +79,13 @@ export const WillhabenWebView: React.FC<WillhabenWebViewProps> = ({
 const styles = StyleSheet.create({
   backButton: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 50 : 20, // malo više na iOS zbog notch
+    top: Platform.OS === "ios" ? 50 : 30, // malo više na iOS zbog notch
     right: 20,
     backgroundColor: "#ef4444",
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
-    zIndex: 999, // da bude iznad WebView
+    zIndex: 999,
   },
   backButtonText: {
     color: "#fff",
