@@ -62,13 +62,13 @@ export function WillhabenWebView({
     <Modal visible={visible} animationType="slide">
       <View style={{ flex: 1 }}>
         {/* WEBVIEW */}
-        <WebView
+        {/* <WebView
           source={{ uri: url }}
           injectedJavaScript={injectedJS}
           javaScriptEnabled
           domStorageEnabled
           style={{ flex: 1 }}
-        />
+        /> */}
 
         {/* ISTO KAO DASS SCHNELLE */}
         <TouchableOpacity
