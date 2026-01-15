@@ -44,6 +44,7 @@ const AnimatedView = Animated.createAnimatedComponent(View);
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
+  const [sellerName, setSellerName] = useState<string | null>(null);
   const { isRadioModeOn } = useRadioMode();
   const colors = isDark ? Colors.dark : Colors.light;
 
@@ -54,6 +55,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
+  console.log(sellerName, "seller name");
 
   const handlePressIn = () => {
     scale.value = withSpring(0.98, springConfig);
@@ -129,25 +131,62 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
       ""
     )}`;
 
+  // const injectedJS = `
+  //   (function () {
+  //     const MESSAGE = ${JSON.stringify(messageTemplate)};
+  //     function fill() {
+  //       const textarea = document.querySelector('#mailContent');
+  //       if (!textarea) return false;
+  //       textarea.focus();
+  //       textarea.value = MESSAGE;
+  //       textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  //       return true;
+  //     }
+  //     let i = 0;
+  //     const interval = setInterval(() => {
+  //       i++;
+  //       if (fill() || i > 10) clearInterval(interval);
+  //     }, 700);
+  //   })();
+  //   true;
+  // `;
   const injectedJS = `
-    (function () {
-      const MESSAGE = ${JSON.stringify(messageTemplate)};
-      function fill() {
-        const textarea = document.querySelector('#mailContent');
-        if (!textarea) return false;
+  (function () {
+    const MESSAGE = ${JSON.stringify(messageTemplate)};
+
+    function fillMessage() {
+      const textarea = document.querySelector('#mailContent');
+      if (textarea) {
         textarea.focus();
         textarea.value = MESSAGE;
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        return true;
       }
-      let i = 0;
-      const interval = setInterval(() => {
-        i++;
-        if (fill() || i > 10) clearInterval(interval);
-      }, 700);
-    })();
-    true;
-  `;
+    }
+
+    function sendSellerName() {
+      const el = document.querySelector(
+        '[data-testid="top-contact-box-seller-name"]'
+      );
+      if (el && el.innerText) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({
+            type: 'SELLER_NAME',
+            value: el.innerText.trim()
+          })
+        );
+      }
+    }
+
+    let tries = 0;
+    const interval = setInterval(() => {
+      tries++;
+      fillMessage();
+      sendSellerName();
+      if (tries > 15) clearInterval(interval);
+    }, 600);
+  })();
+  true;
+`;
 
   const formatPrice = (price: number | null) =>
     price
@@ -270,25 +309,72 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
               <ThemedText style={styles.buttonText}>Pošalji poruku</ThemedText>
             </TouchableOpacity>
 
-            <DassSchnelleSearch vehicle={vehicle} />
+            <DassSchnelleSearch
+              vehicle={{
+                ...vehicle,
+                sellerName: sellerName,
+              }}
+            />
           </View>
         </View>
       </AnimatedView>
 
       {/* MODAL */}
       <Modal visible={modalVisible} animationType="slide">
-        <WebView
-          source={{ uri: willhabenUrl }}
-          injectedJavaScript={injectedJS}
-          javaScriptEnabled
-          domStorageEnabled
-        />
+        <View style={{ flex: 1 }}>
+          <WebView
+            source={{ uri: willhabenUrl }}
+            injectedJavaScript={injectedJS}
+            javaScriptEnabled
+            domStorageEnabled
+            style={{ flex: 1 }}
+            onMessage={(event) => {
+              try {
+                const data = JSON.parse(event.nativeEvent.data);
+                if (data.type === "SELLER_NAME") {
+                  setSellerName(data.value);
+                  console.log("SELLER NAME:", data.value);
+                }
+              } catch (e) {}
+            }}
+          />
+
+          {/* NAZAD DUGME */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setModalVisible(false)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="arrow-back" size={22} color="#fff" />
+            <ThemedText style={styles.backButtonText}>Nazad</ThemedText>
+          </TouchableOpacity>
+        </View>
       </Modal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    position: "absolute",
+    left: 16,
+    top: "20%",
+    transform: [{ translateY: -22 }],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 24,
+    zIndex: 999,
+  },
+  backButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
   card: {
     flexDirection: "row",
     padding: Spacing.md,

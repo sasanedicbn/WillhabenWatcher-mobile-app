@@ -11,7 +11,6 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
   const city = vehicle.location || "";
   const location = `${postcode ? postcode + " " : ""}${city}`.trim();
 
-  // Skripta koja se izvršava samo jednom
   const injectedJS = `
     (function () {
       if (window.__DASS_DONE__) return;
@@ -70,15 +69,20 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: "#6366F1",
-    padding: 12,
-    borderRadius: 8,
+    flexDirection: "row",
     alignItems: "center",
-    margin: 12,
+    justifyContent: "center",
+    width: "100%",
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: "#6366F1",
+    gap: 6,
+    marginVertical: 4,
   },
   buttonText: {
-    color: "#fff",
-    fontWeight: "700",
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 12,
   },
   closeButton: {
     backgroundColor: "#ef4444",
