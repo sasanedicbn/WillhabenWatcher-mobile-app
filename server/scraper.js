@@ -1,17 +1,9 @@
-// import http from "http";
-// import https from "https";
-// import { HttpProxyAgent } from "http-proxy-agent";
-// import { HttpsProxyAgent } from "https-proxy-agent";
-// import { getNextProxy } from "./proxy.js";
 const http = require("http");
 const https = require("https");
 const { HttpProxyAgent } = require("http-proxy-agent");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const { getNextProxy } = require("./proxy.js");
-import { fetchPage } from "./fetchPage.js";
 import { fetchPageIPRoyal } from "./fetchPageIPRoyal.js";
-
-// const webshareProxy = `http://${process.env.WEBSHARE_USER}:${process.env.WEBSHARE_PASS}@${process.env.WEBSHARE_HOST}:${process.env.WEBSHARE_PORT}`;
 
 function fetchPage(url, baseUrl = null) {
   return new Promise((resolve, reject) => {
@@ -143,6 +135,7 @@ function parseVehiclesFromHTML(html) {
       sellerName && /(gmbh|kg|ag|d\.o\.o|ltd|autohaus)/i.test(sellerName)
         ? 0
         : 1;
+    console.log(isPrivate, "IS PRIVATE UNUTAR HTML SCRAPA");
 
     const linkMatch = articleHtml.match(/href="(\/iad\/[^"]+)"/);
     const willhabenUrl = linkMatch
@@ -175,7 +168,9 @@ const FUEL_TYPE_MAP = {
   100010: "Wasserstoff",
 };
 function isPrivateAd(attrs) {
+  console.log(attrs, "funk za private trazi");
   const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.value;
+  console.log(isPrivateAttr, "ISPRIVATE ATTR nakon loopa");
   if (isPrivateAttr === "0") return false; // firma
   if (isPrivateAttr === "1") return true; // privatno
 

@@ -69,8 +69,10 @@ export default function DetailsScreen({ route }: DetailsScreenProps) {
   };
 
   const handleOpenWillhaben = async () => {
-    const vehicleId = vehicle.id.replace('wh-', '');
-    const url = vehicle.willhabenUrl || `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicleId}`;
+    const vehicleId = vehicle.id.replace("wh-", "");
+    const url =
+      vehicle.willhabenUrl ||
+      `https://www.willhaben.at/iad/gebrauchtwagen/d/oglasi/${vehicleId}`;
     try {
       await WebBrowser.openBrowserAsync(url);
     } catch {
@@ -102,10 +104,7 @@ export default function DetailsScreen({ route }: DetailsScreenProps) {
         </ThemedText>
 
         <View
-          style={[
-            styles.priceCard,
-            { backgroundColor: colors.primary + "1A" },
-          ]}
+          style={[styles.priceCard, { backgroundColor: colors.primary + "1A" }]}
         >
           <ThemedText style={[styles.priceText, { color: colors.primary }]}>
             {formatPrice(vehicle.price)}
@@ -114,7 +113,10 @@ export default function DetailsScreen({ route }: DetailsScreenProps) {
 
         <View style={styles.specsContainer}>
           <SpecRow label="Jahr" value={vehicle.year?.toString()} />
-          <SpecRow label="Kilometerstand" value={formatMileage(vehicle.mileage)} />
+          <SpecRow
+            label="Kilometerstand"
+            value={formatMileage(vehicle.mileage)}
+          />
           <SpecRow label="Kraftstoff" value={vehicle.fuelType} />
           <SpecRow label="Standort" value={vehicle.location} />
           {vehicle.phone ? (
