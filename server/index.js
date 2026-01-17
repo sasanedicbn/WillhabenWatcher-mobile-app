@@ -14,11 +14,11 @@ const pushTokens = new Set();
 let lastScrapeTime = null;
 let isFirstScrape = true;
 
+// --- PUSH NOTIFICATIONS ---
 async function sendPushNotifications(newVehicles) {
   if (pushTokens.size === 0 || newVehicles.length === 0) return;
 
   const messages = [];
-
   for (const token of pushTokens) {
     const title =
       newVehicles.length === 1
@@ -71,13 +71,12 @@ async function sendPushNotifications(newVehicles) {
   }
 }
 
+// --- SCRAPING & CACHE ---
 async function scrapeAndStore() {
   try {
     const scrapedVehicles = await scraper.scrapeWillhaben();
 
-    let newCount = 0;
     const newlyFoundVehicles = [];
-
     for (const vehicle of scrapedVehicles) {
       if (!vehicleCache.has(vehicle.id)) {
         const newVehicle = {
@@ -85,10 +84,7 @@ async function scrapeAndStore() {
           isNew: !isFirstScrape,
           firstSeenAt: new Date().toISOString(),
         };
-
-        // console.log("ADDING VEHICLE TO CACHE:", newVehicle); // 🔹 log
         vehicleCache.set(vehicle.id, newVehicle);
-
         if (!isFirstScrape) {
           newVehicleIds.add(vehicle.id);
           newlyFoundVehicles.push(newVehicle);
@@ -99,38 +95,31 @@ async function scrapeAndStore() {
     lastScrapeTime = new Date().toISOString();
     isFirstScrape = false;
 
-    if (newCount > 0) {
-      console.log(`[Willhaben] ${newCount} novih vozila pronađeno`);
+    if (newlyFoundVehicles.length > 0) {
+      console.log(`[Backend] ${newlyFoundVehicles.length} new vehicles`);
       await sendPushNotifications(newlyFoundVehicles);
     }
-    return newCount;
-  } catch (error) {
-    console.error("Scrape error:", error.message);
+
+    return newlyFoundVehicles.length;
+  } catch (e) {
+    console.error("Scrape error:", e.message);
     return 0;
   }
 }
 
+// --- ROUTES ---
 app.post("/api/register-push-token", (req, res) => {
   const { token } = req.body;
-
-  if (!token || typeof token !== "string") {
+  if (!token || typeof token !== "string")
     return res.status(400).json({ error: "Invalid token" });
-  }
-
   pushTokens.add(token);
-  console.log(`[Push] Token registered. Total tokens: ${pushTokens.size}`);
-
-  res.json({ success: true, message: "Push token registered" });
+  console.log(`[Push] Token registered. Total: ${pushTokens.size}`);
+  res.json({ success: true });
 });
 
 app.delete("/api/register-push-token", (req, res) => {
   const { token } = req.body;
-
-  if (token) {
-    pushTokens.delete(token);
-    console.log(`[Push] Token removed. Total tokens: ${pushTokens.size}`);
-  }
-
+  if (token) pushTokens.delete(token);
   res.json({ success: true });
 });
 
@@ -139,7 +128,6 @@ app.get("/api/vehicles", (req, res) => {
     .filter((v) => v.isPrivate === 1)
     .sort((a, b) => new Date(b.firstSeenAt) - new Date(a.firstSeenAt))
     .slice(0, 100);
-
   res.json({ vehicles, lastScrapeTime });
 });
 
@@ -147,16 +135,13 @@ app.get("/api/vehicles/new", (req, res) => {
   const vehicles = Array.from(vehicleCache.values())
     .filter((v) => newVehicleIds.has(v.id))
     .sort((a, b) => new Date(b.firstSeenAt) - new Date(a.firstSeenAt));
-
   res.json({ vehicles, count: vehicles.length });
 });
 
 app.post("/api/vehicles/mark-seen", (req, res) => {
   for (const id of newVehicleIds) {
     const vehicle = vehicleCache.get(id);
-    if (vehicle) {
-      vehicle.isNew = false;
-    }
+    if (vehicle) vehicle.isNew = false;
   }
   newVehicleIds.clear();
   res.json({ success: true });
@@ -196,52 +181,49 @@ app.get("/", (req, res) => {
   });
 });
 
-// DODAJ OVU FUNKCIJU PRE startServer()
+// --- SCRAPE INTERVAL ---
 function getNextScrapeDelay() {
   const now = new Date();
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
+  const h = now.getHours();
+  const m = now.getMinutes();
 
-  // Noćno vreme: 23:00 - 05:50
-  const isNightTime =
-    hours === 23 || // 23:00-23:59
-    (hours >= 0 && hours < 5) || // 00:00-04:59
-    (hours === 5 && minutes < 50); // 05:00-05:49
+  const isNight = h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 45);
 
-  if (isNightTime) {
-    console.log(`[${now.toLocaleTimeString()}] 🌙 Night mode: 20min interval`);
-    return 1200000; // 20 minuta
-  } else {
-    // Danju: random 12-18 sekundi
-    const interval = 12000 + Math.random() * 6000; // 12-18s
+  if (isNight) {
+    // noćni scraping: ~40 minuta
+    const interval = 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
     console.log(
-      `[${now.toLocaleTimeString()}] ☀️ Day mode: ${Math.round(interval / 1000)}s interval`
+      `[${now.toLocaleTimeString()}] 🌙 Night scrape in ${Math.round(interval / 60000)} min`
     );
     return interval;
   }
+
+  // dnevni scraping: 2-5s
+  const interval = 2000 + Math.random() * 3000;
+  console.log(
+    `[${now.toLocaleTimeString()}] ☀️ Day scrape in ${Math.round(interval / 1000)}s`
+  );
+  return interval;
 }
 
+// --- START SERVER & SCRAPER LOOP ---
 async function startServer() {
   await scrapeAndStore();
 
   async function scheduledScrape() {
     try {
       await scrapeAndStore();
-    } catch (error) {
-      console.error("Scrape error:", error.message);
+    } catch (e) {
+      console.error("Scrape error:", e.message);
     }
-
     const nextDelay = getNextScrapeDelay();
     setTimeout(scheduledScrape, nextDelay);
   }
 
-  // Pokreni
   scheduledScrape();
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Backend] API running on port ${PORT}`);
-    console.log(`[Backend] Day mode (05:50-22:59): 12-18s random`);
-    console.log(`[Backend] Night mode (23:00-05:50): 20min interval`);
   });
 }
 

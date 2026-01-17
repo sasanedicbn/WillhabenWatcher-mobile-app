@@ -115,7 +115,9 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   /* =========================
      PORUKA (WEBVIEW)
   ========================= */
+
   const handleMessagePress = () => {
+    setSellerName(null);
     setCurrentPhone(vehicle.phone || null);
     setModalVisible(true);
   };
@@ -131,25 +133,6 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
       ""
     )}`;
 
-  // const injectedJS = `
-  //   (function () {
-  //     const MESSAGE = ${JSON.stringify(messageTemplate)};
-  //     function fill() {
-  //       const textarea = document.querySelector('#mailContent');
-  //       if (!textarea) return false;
-  //       textarea.focus();
-  //       textarea.value = MESSAGE;
-  //       textarea.dispatchEvent(new Event('input', { bubbles: true }));
-  //       return true;
-  //     }
-  //     let i = 0;
-  //     const interval = setInterval(() => {
-  //       i++;
-  //       if (fill() || i > 10) clearInterval(interval);
-  //     }, 700);
-  //   })();
-  //   true;
-  // `;
   const injectedJS = `
   (function () {
     const MESSAGE = ${JSON.stringify(messageTemplate)};
@@ -164,18 +147,24 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
     }
 
     function sendSellerName() {
-      const el = document.querySelector(
-        '[data-testid="top-contact-box-seller-name"]'
-      );
-      if (el && el.innerText) {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: 'SELLER_NAME',
-            value: el.innerText.trim()
-          })
-        );
-      }
-    }
+  if (window.__SELLER_SENT__) return;
+
+  const el = document.querySelector(
+    '[data-testid="top-contact-box-seller-name"]'
+  );
+
+  if (el && el.innerText) {
+    window.__SELLER_SENT__ = true;
+
+    window.ReactNativeWebView.postMessage(
+      JSON.stringify({
+        type: 'SELLER_NAME',
+        value: el.innerText.trim(),
+      })
+    );
+  }
+}
+
 
     let tries = 0;
     const interval = setInterval(() => {

@@ -1,5 +1,17 @@
-const https = require("https");
+// import http from "http";
+// import https from "https";
+// import { HttpProxyAgent } from "http-proxy-agent";
+// import { HttpsProxyAgent } from "https-proxy-agent";
+// import { getNextProxy } from "./proxy.js";
 const http = require("http");
+const https = require("https");
+const { HttpProxyAgent } = require("http-proxy-agent");
+const { HttpsProxyAgent } = require("https-proxy-agent");
+const { getNextProxy } = require("./proxy.js");
+import { fetchPage } from "./fetchPage.js";
+import { fetchPageIPRoyal } from "./fetchPageIPRoyal.js";
+
+// const webshareProxy = `http://${process.env.WEBSHARE_USER}:${process.env.WEBSHARE_PASS}@${process.env.WEBSHARE_HOST}:${process.env.WEBSHARE_PORT}`;
 
 function fetchPage(url, baseUrl = null) {
   return new Promise((resolve, reject) => {
@@ -11,33 +23,38 @@ function fetchPage(url, baseUrl = null) {
         : `${baseUrl}/${url}`;
     }
 
-    if (!fullUrl.startsWith("http")) {
-      reject(new Error(`Invalid URL: ${fullUrl}`));
-      return;
-    }
-
     const parsedUrl = new URL(fullUrl);
-    const protocol = parsedUrl.protocol === "https:" ? https : http;
+
+    // 🔁 UZMI SLEDEĆI PROXY
+    const proxyString = getNextProxy();
+    const [ip, port, user, pass] = proxyString.split(":");
+    const proxyUrl = `http://${user}:${pass}@${ip}:${port}`;
+
+    const agent =
+      parsedUrl.protocol === "https:"
+        ? new HttpsProxyAgent(proxyUrl)
+        : new HttpProxyAgent(proxyUrl);
 
     const options = {
       hostname: parsedUrl.hostname,
       path: parsedUrl.pathname + parsedUrl.search,
       port: parsedUrl.port || (parsedUrl.protocol === "https:" ? 443 : 80),
+      agent,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         Accept:
           "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": "de-AT,de;q=0.9,en;q=0.8",
-        "Cache-Control": "no-cache",
       },
     };
 
+    const protocol = parsedUrl.protocol === "https:" ? https : http;
+
     protocol
       .get(options, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          const redirectUrl = res.headers.location;
-          fetchPage(redirectUrl, fullUrl).then(resolve).catch(reject);
+        if ([301, 302].includes(res.statusCode)) {
+          fetchPage(res.headers.location, fullUrl).then(resolve).catch(reject);
           return;
         }
 
@@ -48,7 +65,6 @@ function fetchPage(url, baseUrl = null) {
       .on("error", reject);
   });
 }
-
 function extractPrice(text) {
   if (!text) return null;
   const match = text.replace(/[^\d]/g, "");
@@ -262,20 +278,31 @@ function parseVehiclesFromJSON(html) {
 
 async function scrapeWillhaben() {
   const url =
-    "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?sfId=ca53e21f-9a65-49d5-acbb-cc094c37d4ba&rows=30&isNavigation=true&DEALER=1&page=1&PRICE_FROM=0&PRICE_TO=10000";
+    "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?rows=30&PRICE_TO=10000";
 
   try {
-    const html = await fetchPage(url);
+    // 1️⃣ PRVO Webshare
+    let html = await fetchPage(url);
 
-    // ✅ SAMO JSON (najstabilnije)
     let vehicles = parseVehiclesFromJSON(html);
     if (vehicles.length === 0) {
       vehicles = parseVehiclesFromHTML(html);
     }
-    // console.log(vehicles, "vozila iz scrapa");
-    return vehicles.filter((v) => v.price === null || v.price <= 10000);
-  } catch (e) {
-    console.error("Scrape error:", e.message);
+
+    // 2️⃣ Ako Webshare faila → IPRoyal
+    if (vehicles.length === 0) {
+      console.warn("⚠️ Webshare fail → switching to IPRoyal");
+      html = await fetchPageIPRoyal(url);
+
+      vehicles = parseVehiclesFromJSON(html);
+      if (vehicles.length === 0) {
+        vehicles = parseVehiclesFromHTML(html);
+      }
+    }
+
+    return vehicles.filter((v) => !v.price || v.price <= 10000);
+  } catch (err) {
+    console.error("Scrape error:", err.message);
     return [];
   }
 }

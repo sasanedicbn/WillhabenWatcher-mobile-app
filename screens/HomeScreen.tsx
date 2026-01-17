@@ -17,25 +17,9 @@ import { usePhone } from "@/context/PhoneContext";
 import { useNewCarSound } from "@/hooks/useNewCarSound";
 import { fetchVehicles, markVehiclesAsSeen, Vehicle } from "@/services/api";
 
-const POLL_INTERVAL = 10000;
-const getPollInterval = () => {
-  const now = new Date();
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
-
-  // Noćno vreme: 23:00 - 05:50
-  const isNightTime =
-    hours === 23 || // 23:00-23:59
-    (hours >= 0 && hours < 5) || // 00:00-04:59
-    (hours === 5 && minutes < 50); // 05:00-05:49
-
-  if (isNightTime) {
-    return 1200000; // 20 minuta = 1,200,000ms
-  } else {
-    // Danju: random 12-18 sekundi
-    return 12000 + Math.random() * 6000; // 12,000-18,000ms
-  }
-};
+// Minimalni interval FE poziva backend-a da vozila stignu brzo korisniku
+const DAY_MIN_INTERVAL = 2000; // 2 sekunde
+const DAY_MAX_INTERVAL = 5000; // 5 sekundi
 
 export default function HomeScreen() {
   const { isDark } = useTheme();
@@ -68,7 +52,7 @@ export default function HomeScreen() {
 
           previousVehicleIds.current = newIds;
         }
-        console.log(data, "DOlaze");
+
         setVehicles(data.vehicles);
         setLastScrapeTime(data.lastScrapeTime);
       } catch (error) {
@@ -81,38 +65,46 @@ export default function HomeScreen() {
     [playNewCarSound]
   );
 
-  useEffect(() => {
-    loadVehicles();
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadVehicles();
-    }, POLL_INTERVAL);
-
-    return () => clearInterval(interval);
-  }, [loadVehicles]);
+  // Polling uskladjen sa FE intervalima
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
 
     const scheduleNextPoll = () => {
-      const nextInterval = getPollInterval();
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
 
-      timeoutId = setTimeout(() => {
-        loadVehicles();
+      // Noćno vreme: 23:00 - 05:50
+      const isNightTime =
+        hours === 23 ||
+        (hours >= 0 && hours < 5) ||
+        (hours === 5 && minutes < 50);
+
+      let nextInterval: number;
+
+      if (isNightTime) {
+        // Noću 40 minuta + random 0-5 min
+        nextInterval = 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
+      } else {
+        // Danju: 2-5 sekundi da korisnik vidi skoro odmah
+        nextInterval =
+          DAY_MIN_INTERVAL +
+          Math.random() * (DAY_MAX_INTERVAL - DAY_MIN_INTERVAL);
+      }
+
+      timeoutId = setTimeout(async () => {
+        await loadVehicles();
         scheduleNextPoll();
       }, nextInterval);
 
-      // Log za debugging (opciono)
-      console.log(`Next poll in ${Math.round(nextInterval / 1000)}s`);
+      console.log(
+        `[FE] Next poll in ${Math.round(nextInterval / 1000)}s (${isNightTime ? "Night" : "Day"})`
+      );
     };
 
-    // Pokreni prvi put
     scheduleNextPoll();
 
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
+    return () => clearTimeout(timeoutId);
   }, [loadVehicles]);
 
   useEffect(() => {
@@ -150,7 +142,7 @@ export default function HomeScreen() {
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
-      {newCarCount > 0 ? (
+      {newCarCount > 0 && (
         <View
           style={[styles.newCarBanner, { backgroundColor: colors.primary }]}
         >
@@ -158,15 +150,15 @@ export default function HomeScreen() {
             {newCarCount} neue Fahrzeuge gefunden!
           </ThemedText>
         </View>
-      ) : null}
-      {lastScrapeTime ? (
+      )}
+      {lastScrapeTime && (
         <ThemedText
           style={[styles.lastUpdate, { color: colors.textSecondary }]}
         >
           Letzte Aktualisierung:{" "}
           {new Date(lastScrapeTime).toLocaleTimeString("de-AT")}
         </ThemedText>
-      ) : null}
+      )}
     </View>
   );
 
