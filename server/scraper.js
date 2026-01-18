@@ -408,7 +408,9 @@ export async function scrapeWillhaben() {
       }
     }
     console.log(vehicles, "gledaj id");
-    return vehicles.filter((v) => !v.price || v.price <= 10000);
+    return vehicles.filter(
+      (v) => v.isPrivate === 1 && (!v.price || v.price <= 10000)
+    );
   } catch (err) {
     console.error("Scrape error:", err.message);
     return [];
