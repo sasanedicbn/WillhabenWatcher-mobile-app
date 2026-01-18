@@ -131,10 +131,11 @@ function parseVehiclesFromHTML(html) {
 
     const priceMatch = articleHtml.match(/€\s*([\d.,]+)/);
     const price = priceMatch ? extractPrice(priceMatch[0]) : null;
-    const isPrivate =
+
+    // PROMIJENI OVO: vraćaj boolean umjesto broja
+    const isPrivate = !(
       sellerName && /(gmbh|kg|ag|d\.o\.o|ltd|autohaus)/i.test(sellerName)
-        ? 0
-        : 1;
+    );
     console.log(isPrivate, "IS PRIVATE UNUTAR HTML SCRAPA");
 
     const linkMatch = articleHtml.match(/href="(\/iad\/[^"]+)"/);
@@ -148,7 +149,7 @@ function parseVehiclesFromHTML(html) {
       price,
       willhabenUrl,
       sellerName,
-      isPrivate,
+      isPrivate, // SADA JE BOOLEAN!
     });
   }
 
@@ -167,10 +168,18 @@ const FUEL_TYPE_MAP = {
   100009: "Hybrid (Diesel/Elektro)",
   100010: "Wasserstoff",
 };
+function isPrivateAd(attrs) {
+  const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.values?.[0];
+  return isPrivateAttr === "1";
+}
+
 // function isPrivateAd(attrs) {
-//   console.log(attrs, "funk za private trazi");
-//   const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.value;
+//   console.log(attrs, "SAD OVO");
+
+//   // POPRAVLJENO: .values[0] umjesto .value
+//   const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.values?.[0];
 //   console.log(isPrivateAttr, "ISPRIVATE ATTR nakon loopa");
+
 //   if (isPrivateAttr === "0") return false; // firma
 //   if (isPrivateAttr === "1") return true; // privatno
 
@@ -196,39 +205,6 @@ const FUEL_TYPE_MAP = {
 
 //   return true; // fizičko lice
 // }
-function isPrivateAd(attrs) {
-  // console.log(attrs, "funk za private trazi");
-
-  // POPRAVLJENO: .values[0] umjesto .value
-  const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.values?.[0];
-  console.log(isPrivateAttr, "ISPRIVATE ATTR nakon loopa");
-
-  if (isPrivateAttr === "0") return false; // firma
-  if (isPrivateAttr === "1") return true; // privatno
-
-  // fallback na stare provjere
-  for (const a of attrs) {
-    if (
-      (a.name === "ORGNAME" && a.values?.[0]) ||
-      (a.name === "COMPANY_NAME" && a.values?.[0]) ||
-      (a.name === "CONTACT_COMPANY" && a.values?.[0])
-    )
-      return false;
-
-    if (a.name === "SELLER_TYPE") {
-      const v = a.values?.[0];
-      if (v && v.toUpperCase() !== "PRIVATE") return false;
-    }
-
-    if (a.name === "CONTACT_NAME") {
-      const v = a.values?.[0];
-      if (v && /(gmbh|kg|ag|d\.o\.o|ltd|autohaus)/i.test(v)) return false;
-    }
-  }
-
-  return true; // fizičko lice
-}
-
 function parseVehiclesFromJSON(html) {
   const vehicles = [];
 
@@ -246,39 +222,31 @@ function parseVehiclesFromJSON(html) {
     for (const ad of ads) {
       const attrs = ad.attributes?.attribute || [];
 
-      // ✅ IZRAČUNAJ JEDNOM
-      const isPrivate = isPrivateAd(attrs);
-
-      // ❌ izbaci firme
-      if (!isPrivate) {
-        continue;
+      // ✅ JEDNOSTAVNA PROVJERA (bez poziva funkcije)
+      const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")
+        ?.values?.[0];
+      if (isPrivateAttr !== "1") {
+        continue; // preskoči oglas firme
       }
 
       const getAttr = (name) =>
         attrs.find((a) => a.name === name)?.values?.[0] || null;
 
       const postcode = getAttr("POSTCODE") || getAttr("ZIP") || null;
-
       const price =
         parseFloat(getAttr("PRICE/AMOUNT") || getAttr("PRICE")) || null;
-
       const year =
         parseInt(getAttr("YEAR_MODEL") || getAttr("YEAR"), 10) || null;
-
       const mileage = parseInt(getAttr("MILEAGE"), 10) || null;
-
       const fuelCode = getAttr("ENGINE/FUEL");
       const fuelType = fuelCode ? FUEL_TYPE_MAP[fuelCode] || fuelCode : null;
-
       const imageUrl = getAttr("MMO")
         ? `https://cache.willhaben.at/mmo/${getAttr("MMO")}`
         : null;
-
       const seoUrl = getAttr("SEO_URL");
       const willhabenUrl = seoUrl
         ? `https://www.willhaben.at/iad/${seoUrl}`
         : `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${ad.id}`;
-
       const bodyText =
         ad.description || getAttr("BODY") || getAttr("DESCRIPTION") || "";
 
@@ -298,9 +266,7 @@ function parseVehiclesFromJSON(html) {
         willhabenUrl,
         phone: extractPhoneNumber(bodyText),
         sellerName: getAttr("CONTACT_NAME") || null,
-
-        isPrivate,
-
+        isPrivate: true,
         postcode,
       });
     }
@@ -314,32 +280,63 @@ function parseVehiclesFromJSON(html) {
 export async function scrapeWillhaben() {
   const url =
     "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?rows=30&PRICE_TO=10000&DEALER=1";
+
   try {
+    console.log("🔍 Scraping URL:", url);
+
     // 1️⃣ PRVO Webshare
     let html = await fetchPage(url);
+    console.log("✅ Fetched HTML, length:", html.length);
 
     let vehicles = parseVehiclesFromJSON(html);
+    console.log(`📊 JSON parsing: ${vehicles.length} vehicles found`);
+
     if (vehicles.length === 0) {
+      console.log("⚠️ JSON parsing failed, trying HTML fallback");
       vehicles = parseVehiclesFromHTML(html);
+      console.log(`📊 HTML parsing: ${vehicles.length} vehicles found`);
     }
 
     // 2️⃣ Ako Webshare faila → IPRoyal
     if (vehicles.length === 0) {
       console.warn("⚠️ Webshare fail → switching to IPRoyal");
       html = await fetchPageIPRoyal(url);
+      console.log("✅ IPRoyal HTML, length:", html.length);
 
       vehicles = parseVehiclesFromJSON(html);
+      console.log(`📊 IPRoyal JSON parsing: ${vehicles.length} vehicles found`);
+
       if (vehicles.length === 0) {
+        console.log("⚠️ IPRoyal JSON parsing failed, trying HTML fallback");
         vehicles = parseVehiclesFromHTML(html);
+        console.log(
+          `📊 IPRoyal HTML parsing: ${vehicles.length} vehicles found`
+        );
       }
     }
-    console.log("ova su false vozila", vehicles);
-    // console.log(vehicles, "ima li privatnih");
-    return vehicles.filter(
+
+    // Log detalje o vozilima
+    console.log("📋 Vehicle details:");
+    vehicles.forEach((v, i) => {
+      console.log(
+        `  ${i + 1}. ${v.title} - €${v.price} - Private: ${v.isPrivate} (Type: ${typeof v.isPrivate})`
+      );
+    });
+
+    const filtered = vehicles.filter(
       (v) => v.isPrivate === true && (!v.price || v.price <= 10000)
     );
+
+    console.log(
+      `🎯 Filter applied: ${vehicles.length} -> ${filtered.length} vehicles`
+    );
+    console.log(
+      `❌ Removed: ${vehicles.length - filtered.length} vehicles (non-private or price > 10000)`
+    );
+
+    return filtered;
   } catch (err) {
-    console.error("Scrape error:", err.message);
+    console.error("❌ Scrape error:", err.message);
     return [];
   }
 }

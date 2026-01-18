@@ -35,34 +35,34 @@ export default function HomeScreen() {
   const loadVehicles = useCallback(
     async (isRefresh = false) => {
       try {
+        console.log("🔄 Fetching vehicles...");
         const data = await fetchVehicles();
-        console.log(data, "podaci dolaze");
-        const privateVehicles = data.vehicles.filter(
-          (vehicle) => vehicle.isPrivate === 1
-        );
+        console.log(`📱 API response: ${data.vehicles.length} vehicles`);
 
+        // Log prvog vozila za debug
         if (data.vehicles.length > 0) {
-          const newIds = new Set(data.vehicles.map((v) => v.id));
-          const actuallyNew = data.vehicles.filter(
-            (v) => !previousVehicleIds.current.has(v.id)
-          );
-
-          if (previousVehicleIds.current.size > 0 && actuallyNew.length > 0) {
-            console.log(`Found ${actuallyNew.length} new vehicles!`);
-            setNewCarCount((prev) => prev + actuallyNew.length);
-            playNewCarSound();
-          }
-
-          previousVehicleIds.current = newIds;
+          const firstVehicle = data.vehicles[0];
+          console.log("🔍 First vehicle:", {
+            id: firstVehicle.id,
+            title: firstVehicle.title,
+            isPrivate: firstVehicle.isPrivate,
+            type: typeof firstVehicle.isPrivate,
+            isNew: firstVehicle.isNew,
+            phone: firstVehicle.phone,
+          });
         }
 
-        setVehicles(data.vehicles);
-        setLastScrapeTime(data.lastScrapeTime);
+        // Filter privatnih (ako treba)
+        const privateVehicles = data.vehicles.filter(
+          (v) => v.isPrivate === true
+        );
+        console.log(
+          `🔐 Private vehicles: ${privateVehicles.length}/${data.vehicles.length}`
+        );
+
+        // ... ostali kod
       } catch (error) {
-        console.error("Error fetching vehicles:", error);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+        console.error("❌ Error fetching vehicles:", error);
       }
     },
     [playNewCarSound]

@@ -125,7 +125,7 @@ app.delete("/api/register-push-token", (req, res) => {
 
 app.get("/api/vehicles", (req, res) => {
   const vehicles = Array.from(vehicleCache.values())
-    .filter((v) => v.isPrivate === 1)
+    .filter((v) => v.isPrivate === true)
     .sort((a, b) => new Date(b.firstSeenAt) - new Date(a.firstSeenAt))
     .slice(0, 100);
   res.json({ vehicles, lastScrapeTime });
