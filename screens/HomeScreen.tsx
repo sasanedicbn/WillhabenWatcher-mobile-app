@@ -17,7 +17,6 @@ import { usePhone } from "@/context/PhoneContext";
 import { useNewCarSound } from "@/hooks/useNewCarSound";
 import { fetchVehicles, markVehiclesAsSeen, Vehicle } from "@/services/api";
 
-// Minimalni interval FE poziva backend-a da vozila stignu brzo korisniku
 const DAY_MIN_INTERVAL = 2000; // 2 sekunde
 const DAY_MAX_INTERVAL = 5000; // 5 sekundi
 
@@ -37,6 +36,10 @@ export default function HomeScreen() {
     async (isRefresh = false) => {
       try {
         const data = await fetchVehicles();
+        // console.log(data, "podaci dolaze");
+        const privateVehicles = data.vehicles.filter(
+          (vehicle) => vehicle.isPrivate === 1
+        );
 
         if (data.vehicles.length > 0) {
           const newIds = new Set(data.vehicles.map((v) => v.id));

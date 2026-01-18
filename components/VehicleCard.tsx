@@ -42,6 +42,7 @@ const springConfig: WithSpringConfig = {
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
+  // console.log(vehicle, "dolazi auto");
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const [sellerName, setSellerName] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
-  console.log(sellerName, "seller name");
+  console.log(vehicle.isPrivate, "isprivate");
 
   const handlePressIn = () => {
     scale.value = withSpring(0.98, springConfig);
