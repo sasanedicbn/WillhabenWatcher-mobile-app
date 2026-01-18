@@ -36,7 +36,7 @@ export default function HomeScreen() {
     async (isRefresh = false) => {
       try {
         const data = await fetchVehicles();
-        // console.log(data, "podaci dolaze");
+        console.log(data, "podaci dolaze");
         const privateVehicles = data.vehicles.filter(
           (vehicle) => vehicle.isPrivate === 1
         );
