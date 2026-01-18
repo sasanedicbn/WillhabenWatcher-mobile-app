@@ -1,9 +1,9 @@
-const http = require("http");
-const https = require("https");
-const { HttpProxyAgent } = require("http-proxy-agent");
-const { HttpsProxyAgent } = require("https-proxy-agent");
-const { getNextProxy } = require("./proxy.js");
-import { fetchPageIPRoyal } from "./fetchPageIPRoyal.js";
+import http from "http";
+import https from "https";
+import { HttpProxyAgent } from "http-proxy-agent";
+import { HttpsProxyAgent } from "https-proxy-agent";
+import { getNextProxy } from "./proxy.js";
+import { fetchPageIPRoyal } from "./fetchPageIPRoyal.ts";
 
 function fetchPage(url, baseUrl = null) {
   return new Promise((resolve, reject) => {
@@ -167,10 +167,42 @@ const FUEL_TYPE_MAP = {
   100009: "Hybrid (Diesel/Elektro)",
   100010: "Wasserstoff",
 };
+// function isPrivateAd(attrs) {
+//   console.log(attrs, "funk za private trazi");
+//   const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.value;
+//   console.log(isPrivateAttr, "ISPRIVATE ATTR nakon loopa");
+//   if (isPrivateAttr === "0") return false; // firma
+//   if (isPrivateAttr === "1") return true; // privatno
+
+//   // fallback na stare provjere
+//   for (const a of attrs) {
+//     if (
+//       (a.name === "ORGNAME" && a.values?.[0]) ||
+//       (a.name === "COMPANY_NAME" && a.values?.[0]) ||
+//       (a.name === "CONTACT_COMPANY" && a.values?.[0])
+//     )
+//       return false;
+
+//     if (a.name === "SELLER_TYPE") {
+//       const v = a.values?.[0];
+//       if (v && v.toUpperCase() !== "PRIVATE") return false;
+//     }
+
+//     if (a.name === "CONTACT_NAME") {
+//       const v = a.values?.[0];
+//       if (v && /(gmbh|kg|ag|d\.o\.o|ltd|autohaus)/i.test(v)) return false;
+//     }
+//   }
+
+//   return true; // fizičko lice
+// }
 function isPrivateAd(attrs) {
   console.log(attrs, "funk za private trazi");
-  const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.value;
+
+  // POPRAVLJENO: .values[0] umjesto .value
+  const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.values?.[0];
   console.log(isPrivateAttr, "ISPRIVATE ATTR nakon loopa");
+
   if (isPrivateAttr === "0") return false; // firma
   if (isPrivateAttr === "1") return true; // privatno
 
@@ -271,7 +303,7 @@ function parseVehiclesFromJSON(html) {
   return vehicles;
 }
 
-async function scrapeWillhaben() {
+export async function scrapeWillhaben() {
   const url =
     "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?rows=30&PRICE_TO=10000";
 
@@ -301,5 +333,3 @@ async function scrapeWillhaben() {
     return [];
   }
 }
-
-module.exports = { scrapeWillhaben };

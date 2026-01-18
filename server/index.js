@@ -1,6 +1,6 @@
-const express = require("express");
-const cors = require("cors");
-const scraper = require("./scraper");
+import express from "express";
+import cors from "cors";
+import { scrapeWillhaben } from "./scraper.js";
 
 const app = express();
 const PORT = process.env.API_PORT || 8083;
@@ -74,7 +74,7 @@ async function sendPushNotifications(newVehicles) {
 // --- SCRAPING & CACHE ---
 async function scrapeAndStore() {
   try {
-    const scrapedVehicles = await scraper.scrapeWillhaben();
+    const scrapedVehicles = await scrapeWillhaben();
 
     const newlyFoundVehicles = [];
     for (const vehicle of scrapedVehicles) {
