@@ -168,43 +168,23 @@ const FUEL_TYPE_MAP = {
   100009: "Hybrid (Diesel/Elektro)",
   100010: "Wasserstoff",
 };
+// function isPrivateAd(attrs) {
+//   const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.values?.[0];
+//   return isPrivateAttr === "1";
+// }
 function isPrivateAd(attrs) {
+  // Prvo provjeri AUTDEALER - najpouzdanije
+  console.log(attrs, "logovi iz attrs");
+  const autdealerAttr = attrs.find((a) => a.name === "AUTDEALER")?.values?.[0];
+
+  if (autdealerAttr === "1") return false; // firma
+  if (autdealerAttr === "0") return true; // privatno
+
+  // Onda provjeri ISPRIVATE
   const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.values?.[0];
   return isPrivateAttr === "1";
 }
 
-// function isPrivateAd(attrs) {
-//   console.log(attrs, "SAD OVO");
-
-//   // POPRAVLJENO: .values[0] umjesto .value
-//   const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")?.values?.[0];
-//   console.log(isPrivateAttr, "ISPRIVATE ATTR nakon loopa");
-
-//   if (isPrivateAttr === "0") return false; // firma
-//   if (isPrivateAttr === "1") return true; // privatno
-
-//   // fallback na stare provjere
-//   for (const a of attrs) {
-//     if (
-//       (a.name === "ORGNAME" && a.values?.[0]) ||
-//       (a.name === "COMPANY_NAME" && a.values?.[0]) ||
-//       (a.name === "CONTACT_COMPANY" && a.values?.[0])
-//     )
-//       return false;
-
-//     if (a.name === "SELLER_TYPE") {
-//       const v = a.values?.[0];
-//       if (v && v.toUpperCase() !== "PRIVATE") return false;
-//     }
-
-//     if (a.name === "CONTACT_NAME") {
-//       const v = a.values?.[0];
-//       if (v && /(gmbh|kg|ag|d\.o\.o|ltd|autohaus)/i.test(v)) return false;
-//     }
-//   }
-
-//   return true; // fizičko lice
-// }
 function parseVehiclesFromJSON(html) {
   const vehicles = [];
 
@@ -222,10 +202,11 @@ function parseVehiclesFromJSON(html) {
     for (const ad of ads) {
       const attrs = ad.attributes?.attribute || [];
 
-      // ✅ JEDNOSTAVNA PROVJERA (bez poziva funkcije)
-      const isPrivateAttr = attrs.find((a) => a.name === "ISPRIVATE")
-        ?.values?.[0];
-      if (isPrivateAttr !== "1") {
+      // ✅ KORISTI isPrivateAd FUNKCIJU koju si napravio/la!
+      const isPrivate = isPrivateAd(attrs);
+
+      if (!isPrivate) {
+        console.log(`Skipping company ad: ${ad.id}`);
         continue; // preskoči oglas firme
       }
 
@@ -266,7 +247,7 @@ function parseVehiclesFromJSON(html) {
         willhabenUrl,
         phone: extractPhoneNumber(bodyText),
         sellerName: getAttr("CONTACT_NAME") || null,
-        isPrivate: true,
+        isPrivate: isPrivate, // 👈 KORISTI STVARNU VRIJEDNOST, ne true!
         postcode,
       });
     }

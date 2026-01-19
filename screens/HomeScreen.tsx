@@ -15,10 +15,16 @@ import { Spacing, Colors } from "@/constants/theme";
 import { useTheme } from "@/hooks/useTheme";
 import { usePhone } from "@/context/PhoneContext";
 import { useNewCarSound } from "@/hooks/useNewCarSound";
-import { fetchVehicles, markVehiclesAsSeen, Vehicle } from "@/services/api";
+import {
+  fetchNewVehicles,
+  fetchVehicles,
+  markVehiclesAsSeen,
+  Vehicle,
+} from "@/services/api";
+import * as Notifications from "expo-notifications";
 
-const DAY_MIN_INTERVAL = 2000; // 2 sekunde
-const DAY_MAX_INTERVAL = 5000; // 5 sekundi
+const DAY_MIN_INTERVAL = 15000; // 2 sekunde
+const DAY_MAX_INTERVAL = 25000; // 5 sekundi
 
 export default function HomeScreen() {
   const { isDark } = useTheme();
@@ -60,13 +66,61 @@ export default function HomeScreen() {
           `🔐 Private vehicles: ${privateVehicles.length}/${data.vehicles.length}`
         );
 
-        // ... ostali kod
+        // ✅ OVO JE KLJUČNI DIO KOJI FALI!
+        if (privateVehicles.length > 0) {
+          const newIds = new Set(privateVehicles.map((v) => v.id));
+          const actuallyNew = privateVehicles.filter(
+            (v) => !previousVehicleIds.current.has(v.id)
+          );
+
+          if (previousVehicleIds.current.size > 0 && actuallyNew.length > 0) {
+            console.log(`🎉 Found ${actuallyNew.length} new vehicles!`);
+            setNewCarCount((prev) => prev + actuallyNew.length);
+            playNewCarSound();
+          }
+
+          previousVehicleIds.current = newIds;
+        }
+
+        // ✅ OVO POSTAVLJA VOZILA NA EKRAN
+        setVehicles(privateVehicles);
+        setLastScrapeTime(data.lastScrapeTime);
       } catch (error) {
         console.error("❌ Error fetching vehicles:", error);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
     },
     [playNewCarSound]
   );
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener(
+      async () => {
+        console.log("📩 Push received → fetch ONLY new vehicles");
+
+        const data = await fetchNewVehicles();
+
+        if (data.vehicles.length > 0) {
+          setVehicles((prev) => {
+            const existingIds = new Set(prev.map((v) => v.id));
+            const uniqueNew = data.vehicles.filter(
+              (v) => !existingIds.has(v.id)
+            );
+            return [...uniqueNew, ...prev];
+          });
+
+          setNewCarCount((prev) => prev + data.vehicles.length);
+          playNewCarSound();
+
+          // 🔥 OVO JE KLJUČNO
+          await markVehiclesAsSeen();
+        }
+      }
+    );
+
+    return () => subscription.remove();
+  }, [playNewCarSound]);
 
   // Polling uskladjen sa FE intervalima
   useEffect(() => {

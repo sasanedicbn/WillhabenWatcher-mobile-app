@@ -72,6 +72,7 @@ async function sendPushNotifications(newVehicles) {
 }
 
 // --- SCRAPING & CACHE ---
+
 async function scrapeAndStore() {
   try {
     const scrapedVehicles = await scrapeWillhaben();
@@ -84,6 +85,13 @@ async function scrapeAndStore() {
           isNew: !isFirstScrape,
           firstSeenAt: new Date().toISOString(),
         };
+        console.log("Adding to cache:", {
+          id: newVehicle.id,
+          hasIsPrivate: "isPrivate" in newVehicle,
+          isPrivateValue: newVehicle.isPrivate,
+          isPrivateType: typeof newVehicle.isPrivate,
+        });
+
         vehicleCache.set(vehicle.id, newVehicle);
         if (!isFirstScrape) {
           newVehicleIds.add(vehicle.id);
