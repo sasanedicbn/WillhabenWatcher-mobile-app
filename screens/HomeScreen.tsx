@@ -23,8 +23,8 @@ import {
 } from "@/services/api";
 import * as Notifications from "expo-notifications";
 
-const DAY_MIN_INTERVAL = 15000; // 2 sekunde
-const DAY_MAX_INTERVAL = 25000; // 5 sekundi
+const DAY_MIN_INTERVAL = 15000;
+const DAY_MAX_INTERVAL = 25000;
 
 export default function HomeScreen() {
   const { isDark } = useTheme();
@@ -41,32 +41,16 @@ export default function HomeScreen() {
   const loadVehicles = useCallback(
     async (isRefresh = false) => {
       try {
-        console.log("🔄 Fetching vehicles...");
         const data = await fetchVehicles();
-        console.log(`📱 API response: ${data.vehicles.length} vehicles`);
 
-        // Log prvog vozila za debug
         if (data.vehicles.length > 0) {
           const firstVehicle = data.vehicles[0];
-          console.log("🔍 First vehicle:", {
-            id: firstVehicle.id,
-            title: firstVehicle.title,
-            isPrivate: firstVehicle.isPrivate,
-            type: typeof firstVehicle.isPrivate,
-            isNew: firstVehicle.isNew,
-            phone: firstVehicle.phone,
-          });
         }
 
-        // Filter privatnih (ako treba)
         const privateVehicles = data.vehicles.filter(
           (v) => v.isPrivate === true
         );
-        console.log(
-          `🔐 Private vehicles: ${privateVehicles.length}/${data.vehicles.length}`
-        );
 
-        // ✅ OVO JE KLJUČNI DIO KOJI FALI!
         if (privateVehicles.length > 0) {
           const newIds = new Set(privateVehicles.map((v) => v.id));
           const actuallyNew = privateVehicles.filter(
@@ -74,7 +58,6 @@ export default function HomeScreen() {
           );
 
           if (previousVehicleIds.current.size > 0 && actuallyNew.length > 0) {
-            console.log(`🎉 Found ${actuallyNew.length} new vehicles!`);
             setNewCarCount((prev) => prev + actuallyNew.length);
             playNewCarSound();
           }
@@ -82,7 +65,6 @@ export default function HomeScreen() {
           previousVehicleIds.current = newIds;
         }
 
-        // ✅ OVO POSTAVLJA VOZILA NA EKRAN
         setVehicles(privateVehicles);
         setLastScrapeTime(data.lastScrapeTime);
       } catch (error) {
@@ -97,8 +79,6 @@ export default function HomeScreen() {
   useEffect(() => {
     const subscription = Notifications.addNotificationReceivedListener(
       async () => {
-        console.log("📩 Push received → fetch ONLY new vehicles");
-
         const data = await fetchNewVehicles();
 
         if (data.vehicles.length > 0) {
@@ -113,7 +93,6 @@ export default function HomeScreen() {
           setNewCarCount((prev) => prev + data.vehicles.length);
           playNewCarSound();
 
-          // 🔥 OVO JE KLJUČNO
           await markVehiclesAsSeen();
         }
       }
@@ -122,7 +101,6 @@ export default function HomeScreen() {
     return () => subscription.remove();
   }, [playNewCarSound]);
 
-  // Polling uskladjen sa FE intervalima
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
 
@@ -131,7 +109,6 @@ export default function HomeScreen() {
       const hours = now.getHours();
       const minutes = now.getMinutes();
 
-      // Noćno vreme: 23:00 - 05:50
       const isNightTime =
         hours === 23 ||
         (hours >= 0 && hours < 5) ||
@@ -140,10 +117,8 @@ export default function HomeScreen() {
       let nextInterval: number;
 
       if (isNightTime) {
-        // Noću 40 minuta + random 0-5 min
         nextInterval = 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
       } else {
-        // Danju: 2-5 sekundi da korisnik vidi skoro odmah
         nextInterval =
           DAY_MIN_INTERVAL +
           Math.random() * (DAY_MAX_INTERVAL - DAY_MIN_INTERVAL);
@@ -153,10 +128,6 @@ export default function HomeScreen() {
         await loadVehicles();
         scheduleNextPoll();
       }, nextInterval);
-
-      console.log(
-        `[FE] Next poll in ${Math.round(nextInterval / 1000)}s (${isNightTime ? "Night" : "Day"})`
-      );
     };
 
     scheduleNextPoll();
@@ -184,11 +155,6 @@ export default function HomeScreen() {
     setRefreshing(true);
     loadVehicles(true);
   }, [loadVehicles]);
-
-  const handleClearNewCount = async () => {
-    setNewCarCount(0);
-    await markVehiclesAsSeen();
-  };
 
   const renderItem = ({ item, index }: { item: Vehicle; index: number }) => (
     <>

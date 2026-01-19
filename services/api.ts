@@ -17,6 +17,8 @@ export interface Vehicle {
   sellerName: string | null;
   isNew?: boolean;
   firstSeenAt?: string;
+  isPrivate?: boolean;
+  postcode?: string;
 }
 
 export const getBaseUrl = () => {
