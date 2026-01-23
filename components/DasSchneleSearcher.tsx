@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useRef } from "react";
 import { View, Modal, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { WebView } from "react-native-webview";
@@ -57,10 +58,11 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
         />
 
         <TouchableOpacity
-          style={styles.closeButton}
+          style={styles.backButton}
           onPress={() => setModalVisible(false)}
         >
-          <Text style={styles.closeText}>Zatvori</Text>
+          <Ionicons name="arrow-back" size={22} color="#fff" />
+          <Text style={styles.backButtonText}>Nazad</Text>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -68,6 +70,25 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    position: "absolute",
+    left: 16,
+    top: "20%",
+    transform: [{ translateY: -22 }],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 24,
+    zIndex: 999,
+  },
+  backButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
   button: {
     flexDirection: "row",
     alignItems: "center",
@@ -83,14 +104,5 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "600",
     fontSize: 12,
-  },
-  closeButton: {
-    backgroundColor: "#ef4444",
-    padding: 12,
-    alignItems: "center",
-  },
-  closeText: {
-    color: "#fff",
-    fontWeight: "700",
   },
 });

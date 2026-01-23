@@ -42,7 +42,6 @@ const springConfig: WithSpringConfig = {
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
-  // console.log(vehicle, "dolazi auto");
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const [sellerName, setSellerName] = useState<string | null>(null);
@@ -66,13 +65,8 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
     scale.value = withSpring(1, springConfig);
   };
 
-  /* =========================
-     GOOGLE SEARCH (SLIKA)
-  ========================= */
   const handleImagePress = async () => {
-    const query = encodeURIComponent(
-      `${vehicle.title} ${vehicle.location} telefon kontakt`
-    );
+    const query = encodeURIComponent(`${vehicle.sellerName}  Telefonnummer`);
     const googleUrl = `https://www.google.com/search?q=${query}`;
 
     try {
@@ -82,9 +76,6 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
     }
   };
 
-  /* =========================
-     WILLHABEN / POZIV (NASLOV)
-  ========================= */
   const handleCardPress = async () => {
     setCurrentPhone(vehicle.phone || null);
 
@@ -103,7 +94,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       vehicle.willhabenUrl ||
       `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace(
         "wh-",
-        ""
+        "",
       )}`;
 
     try {
@@ -112,10 +103,6 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       Alert.alert("Greška", "Ne mogu otvoriti Willhaben oglas");
     }
   };
-
-  /* =========================
-     PORUKA (WEBVIEW)
-  ========================= */
 
   const handleMessagePress = () => {
     setSellerName(null);
@@ -131,7 +118,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
     vehicle.willhabenUrl ||
     `https://www.willhaben.at/iad/gebrauchtwagen/d/auto/${vehicle.id.replace(
       "wh-",
-      ""
+      "",
     )}`;
 
   const injectedJS = `
@@ -199,7 +186,7 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
       parts.push(
         vehicle.postcode
           ? `${vehicle.postcode} ${vehicle.location}`
-          : vehicle.location
+          : vehicle.location,
       );
     }
     return parts.join(" • ");
