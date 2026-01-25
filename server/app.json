@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "b57ab903-254e-4382-883b-819c0575ad36"
+      }
+    },
+    "android": {
+      "package": "com.sasanedic47.willhabencarsserver"
+    }
+  }
+}

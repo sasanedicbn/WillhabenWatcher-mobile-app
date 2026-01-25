@@ -55,7 +55,6 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
-  console.log(vehicle.isPrivate, "isprivate");
 
   const handlePressIn = () => {
     scale.value = withSpring(0.98, springConfig);
@@ -66,7 +65,9 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleImagePress = async () => {
-    const query = encodeURIComponent(`${vehicle.sellerName}  Telefonnummer`);
+    const nameForSearch = sellerName || vehicle.sellerName || "";
+
+    const query = encodeURIComponent(`${nameForSearch} Telefonnummer`);
     const googleUrl = `https://www.google.com/search?q=${query}`;
 
     try {
@@ -105,14 +106,11 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleMessagePress = () => {
-    setSellerName(null);
     setCurrentPhone(vehicle.phone || null);
     setModalVisible(true);
   };
 
-  const messageTemplate = `Hallöchen 🥰🥰🥰 haben Sie kurz Zeit für ein Telefonat?
-Er gefällt mir und der Preis passt mir auch.
-Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.`;
+  const messageTemplate = `Hallöchen 🥰🥰🥰 haben sie kurz Zeit für ein Telefonat er gefällt mir und der preis passt mir auch 06643972640.`;
 
   const willhabenUrl =
     vehicle.willhabenUrl ||
@@ -310,7 +308,6 @@ Bitte melden Sie sich bei mir, ich bin ein seriöser und verlässlicher Käufer.
                 const data = JSON.parse(event.nativeEvent.data);
                 if (data.type === "SELLER_NAME") {
                   setSellerName(data.value);
-                  console.log("SELLER NAME:", data.value);
                 }
               } catch (e) {}
             }}

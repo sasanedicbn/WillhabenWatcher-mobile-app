@@ -26,38 +26,38 @@ export const getBaseUrl = () => {
   return 'http://localhost:8083'; // za lokalno testiranje
 };
 
-export function getApiBaseUrl() {
-  if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.location) {
-      const { protocol, hostname } = window.location;
+// export function getApiBaseUrl() {
+//   if (Platform.OS === 'web') {
+//     if (typeof window !== 'undefined' && window.location) {
+//       const { protocol, hostname } = window.location;
       
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return 'http://localhost:8083';
-      }
+//       if (hostname === 'localhost' || hostname === '127.0.0.1') {
+//         return 'http://localhost:8083';
+//       }
       
-      if (hostname.includes('replit') || hostname.includes('riker')) {
-        const apiUrl = `${protocol}//${hostname}:3000`;
-        console.log('[API] Using Replit external URL:', apiUrl);
-        return apiUrl;
-      }
+//       if (hostname.includes('replit') || hostname.includes('riker')) {
+//         const apiUrl = `${protocol}//${hostname}:3000`;
+//         console.log('[API] Using Replit external URL:', apiUrl);
+//         return apiUrl;
+//       }
       
-      return `${protocol}//${hostname}`;
-    }
-    return 'http://localhost:8083';
-  }
+//       return `${protocol}//${hostname}`;
+//     }
+//     return 'http://localhost:8083';
+//   }
   
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const host = hostUri.split(':')[0];
-    if (host.includes('replit') || host.includes('riker')) {
-      console.log('[API] Using Expo Go URL for Replit:', `https://${host}:3000`);
-      return `https://${host}:3000`;
-    }
-    return `http://${host}:8083`;
-  }
+//   const hostUri = Constants.expoConfig?.hostUri;
+//   if (hostUri) {
+//     const host = hostUri.split(':')[0];
+//     if (host.includes('replit') || host.includes('riker')) {
+//       console.log('[API] Using Expo Go URL for Replit:', `https://${host}:3000`);
+//       return `https://${host}:3000`;
+//     }
+//     return `http://${host}:8083`;
+//   }
 
-  return 'http://localhost:8083';
-}
+//   return 'http://localhost:8083';
+// }
 
 export async function fetchVehicles(): Promise<{ vehicles: Vehicle[]; lastScrapeTime: string | null }> {
   try {

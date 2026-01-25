@@ -23,38 +23,62 @@ import {
 } from "@/services/api";
 import * as Notifications from "expo-notifications";
 
-const DAY_MIN_INTERVAL = 15000;
-const DAY_MAX_INTERVAL = 25000;
+// Danju agresivno (može), noću rijetko
+const DAY_MIN_INTERVAL = 1500;
+const DAY_MAX_INTERVAL = 3000;
+
+function computeNextInterval(): number {
+  const now = new Date();
+  const h = now.getHours();
+  const m = now.getMinutes();
+
+  const isNightTime = h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 50);
+
+  if (isNightTime) {
+    return 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
+  }
+
+  return (
+    DAY_MIN_INTERVAL + Math.random() * (DAY_MAX_INTERVAL - DAY_MIN_INTERVAL)
+  );
+}
 
 export default function HomeScreen() {
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
   const { playNewCarSound } = useNewCarSound();
+
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastScrapeTime, setLastScrapeTime] = useState<string | null>(null);
   const [newCarCount, setNewCarCount] = useState(0);
+
   const previousVehicleIds = useRef<Set<string>>(new Set());
   const colors = isDark ? Colors.dark : Colors.light;
 
+  // Guard da ne radiš paralelne fetch-eve (najbitnije)
+  const inFlightRef = useRef(false);
+
   const loadVehicles = useCallback(
     async (isRefresh = false) => {
+      // Ako je već u toku, ne dupliraj
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
+
       try {
+        if (!isRefresh) setLoading((prev) => (prev ? true : prev));
+
         const data = await fetchVehicles();
 
-        if (data.vehicles.length > 0) {
-          const firstVehicle = data.vehicles[0];
-        }
-
         const privateVehicles = data.vehicles.filter(
-          (v) => v.isPrivate === true
+          (v) => v.isPrivate === true,
         );
 
         if (privateVehicles.length > 0) {
           const newIds = new Set(privateVehicles.map((v) => v.id));
           const actuallyNew = privateVehicles.filter(
-            (v) => !previousVehicleIds.current.has(v.id)
+            (v) => !previousVehicleIds.current.has(v.id),
           );
 
           if (previousVehicleIds.current.size > 0 && actuallyNew.length > 0) {
@@ -63,6 +87,8 @@ export default function HomeScreen() {
           }
 
           previousVehicleIds.current = newIds;
+        } else {
+          previousVehicleIds.current = new Set();
         }
 
         setVehicles(privateVehicles);
@@ -70,83 +96,80 @@ export default function HomeScreen() {
       } catch (error) {
         console.error("❌ Error fetching vehicles:", error);
       } finally {
+        inFlightRef.current = false;
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [playNewCarSound]
+    [playNewCarSound],
   );
+
+  // 1) Push-notification listener (kad notifikacija stigne -> povuci /new)
   useEffect(() => {
     const subscription = Notifications.addNotificationReceivedListener(
       async () => {
-        const data = await fetchNewVehicles();
+        try {
+          const data = await fetchNewVehicles();
 
-        if (data.vehicles.length > 0) {
-          setVehicles((prev) => {
-            const existingIds = new Set(prev.map((v) => v.id));
-            const uniqueNew = data.vehicles.filter(
-              (v) => !existingIds.has(v.id)
-            );
-            return [...uniqueNew, ...prev];
-          });
+          if (data.vehicles.length > 0) {
+            setVehicles((prev) => {
+              const existingIds = new Set(prev.map((v) => v.id));
+              const uniqueNew = data.vehicles.filter(
+                (v) => !existingIds.has(v.id),
+              );
+              return [...uniqueNew, ...prev];
+            });
 
-          setNewCarCount((prev) => prev + data.vehicles.length);
-          playNewCarSound();
+            setNewCarCount((prev) => prev + data.vehicles.length);
+            playNewCarSound();
 
-          await markVehiclesAsSeen();
+            await markVehiclesAsSeen();
+          }
+        } catch (e) {
+          console.error("❌ Error handling notification refresh:", e);
         }
-      }
+      },
     );
 
     return () => subscription.remove();
   }, [playNewCarSound]);
 
+  // 2) Polling: odma load, pa onda zakazuj sljedeći (NE čeka prvih 1.5–3s)
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
 
-    const scheduleNextPoll = () => {
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
+    const tick = async () => {
+      if (cancelled) return;
 
-      const isNightTime =
-        hours === 23 ||
-        (hours >= 0 && hours < 5) ||
-        (hours === 5 && minutes < 50);
+      await loadVehicles(false);
 
-      let nextInterval: number;
-
-      if (isNightTime) {
-        nextInterval = 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
-      } else {
-        nextInterval =
-          DAY_MIN_INTERVAL +
-          Math.random() * (DAY_MAX_INTERVAL - DAY_MIN_INTERVAL);
-      }
-
-      timeoutId = setTimeout(async () => {
-        await loadVehicles();
-        scheduleNextPoll();
-      }, nextInterval);
+      if (cancelled) return;
+      timeoutId = setTimeout(tick, computeNextInterval());
     };
 
-    scheduleNextPoll();
+    tick(); // ✅ odmah
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [loadVehicles]);
 
+  // 3) Kad se app vrati u foreground, uradi instant refresh (bez overlap-a)
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") {
-        loadVehicles();
+        loadVehicles(false);
       }
     });
 
-    return () => subscription?.remove();
+    return () => subscription.remove();
   }, [loadVehicles]);
 
+  // 4) Phone “side effect”
   useEffect(() => {
-    if (vehicles.length > 0 && vehicles[0].phone) {
+    if (vehicles.length > 0 && vehicles[0]?.phone) {
       setCurrentPhone(vehicles[0].phone);
     }
   }, [vehicles, setCurrentPhone]);
@@ -174,6 +197,7 @@ export default function HomeScreen() {
           </ThemedText>
         </View>
       )}
+
       {lastScrapeTime && (
         <ThemedText
           style={[styles.lastUpdate, { color: colors.textSecondary }]}
@@ -215,7 +239,7 @@ export default function HomeScreen() {
           Keine Fahrzeuge verfügbar
         </ThemedText>
         <ThemedText style={[styles.emptyHint, { color: colors.textSecondary }]}>
-          Willhaben wird alle 30 Sekunden gescannt
+          Auto-Refresh aktiv (Tag: 1.5–3s, Nacht: ~40min)
         </ThemedText>
       </View>
     );
@@ -239,7 +263,6 @@ export default function HomeScreen() {
     />
   );
 }
-
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,

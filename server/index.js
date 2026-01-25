@@ -11,8 +11,14 @@ app.use(express.json());
 const vehicleCache = new Map();
 const newVehicleIds = new Set();
 const pushTokens = new Set();
+
 let lastScrapeTime = null;
 let isFirstScrape = true;
+
+// --- SCRAPE LOCK (kritično) ---
+let isScraping = false;
+/** Ako scrape već traje, svi pozivi dobiju isti promise (nema overlap-a). */
+let currentScrapePromise = null;
 
 // --- PUSH NOTIFICATIONS ---
 async function sendPushNotifications(newVehicles) {
@@ -28,7 +34,9 @@ async function sendPushNotifications(newVehicles) {
     const firstVehicle = newVehicles[0];
     const body =
       newVehicles.length === 1
-        ? `${firstVehicle.title} - €${firstVehicle.price?.toLocaleString("de-AT") || "N/A"}`
+        ? `${firstVehicle.title} - €${
+            firstVehicle.price?.toLocaleString("de-AT") || "N/A"
+          }`
         : `${firstVehicle.title} i još ${newVehicles.length - 1} vozila`;
 
     messages.push({
@@ -54,72 +62,91 @@ async function sendPushNotifications(newVehicles) {
     const result = await response.json();
     console.log(`[Push] Sent ${messages.length} notifications`);
 
-    if (result.data) {
+    // Expo odgovara sa "data" kao niz ticket-a u mnogim slučajevima
+    if (Array.isArray(result?.data)) {
       result.data.forEach((ticket, index) => {
-        if (ticket.status === "error") {
-          console.log(`[Push] Error for token: ${ticket.message}`);
+        if (ticket?.status === "error") {
+          console.log(`[Push] Error: ${ticket.message || "unknown"}`);
           if (ticket.details?.error === "DeviceNotRegistered") {
-            const token = messages[index].to;
-            pushTokens.delete(token);
-            console.log(`[Push] Removed invalid token`);
+            const badToken = messages[index]?.to;
+            if (badToken) {
+              pushTokens.delete(badToken);
+              console.log(`[Push] Removed invalid token`);
+            }
           }
         }
       });
     }
   } catch (error) {
-    console.error("[Push] Failed to send notifications:", error.message);
+    console.error(
+      "[Push] Failed to send notifications:",
+      error?.message || error,
+    );
   }
 }
 
 // --- SCRAPING & CACHE ---
-
 async function scrapeAndStore() {
-  try {
-    const scrapedVehicles = await scrapeWillhaben();
+  const scrapedVehicles = await scrapeWillhaben();
 
-    const newlyFoundVehicles = [];
-    for (const vehicle of scrapedVehicles) {
-      if (!vehicleCache.has(vehicle.id)) {
-        const newVehicle = {
-          ...vehicle,
-          isNew: !isFirstScrape,
-          firstSeenAt: new Date().toISOString(),
-        };
-        console.log("Adding to cache:", {
-          id: newVehicle.id,
-          hasIsPrivate: "isPrivate" in newVehicle,
-          isPrivateValue: newVehicle.isPrivate,
-          isPrivateType: typeof newVehicle.isPrivate,
-        });
+  const newlyFoundVehicles = [];
+  for (const vehicle of scrapedVehicles) {
+    if (!vehicleCache.has(vehicle.id)) {
+      const newVehicle = {
+        ...vehicle,
+        isNew: !isFirstScrape,
+        firstSeenAt: new Date().toISOString(),
+      };
 
-        vehicleCache.set(vehicle.id, newVehicle);
-        if (!isFirstScrape) {
-          newVehicleIds.add(vehicle.id);
-          newlyFoundVehicles.push(newVehicle);
-        }
+      vehicleCache.set(vehicle.id, newVehicle);
+
+      if (!isFirstScrape) {
+        newVehicleIds.add(vehicle.id);
+        newlyFoundVehicles.push(newVehicle);
       }
     }
-
-    lastScrapeTime = new Date().toISOString();
-    isFirstScrape = false;
-
-    if (newlyFoundVehicles.length > 0) {
-      console.log(`[Backend] ${newlyFoundVehicles.length} new vehicles`);
-      await sendPushNotifications(newlyFoundVehicles);
-    }
-
-    return newlyFoundVehicles.length;
-  } catch (e) {
-    console.error("Scrape error:", e.message);
-    return 0;
   }
+
+  lastScrapeTime = new Date().toISOString();
+  isFirstScrape = false;
+
+  if (newlyFoundVehicles.length > 0) {
+    console.log(`[Backend] ${newlyFoundVehicles.length} new vehicles`);
+    // Može biti sporije, ali je deterministično i bez overlap-a
+    await sendPushNotifications(newlyFoundVehicles);
+  }
+
+  return newlyFoundVehicles.length;
+}
+
+/** Safe wrapper: nema paralelnih scrape-ova. */
+async function scrapeAndStoreSafe() {
+  if (currentScrapePromise) return currentScrapePromise;
+
+  currentScrapePromise = (async () => {
+    if (isScraping) return 0; // dodatni safety, realno neće doći ovdje
+    isScraping = true;
+
+    try {
+      return await scrapeAndStore();
+    } catch (e) {
+      console.error("Scrape error:", e?.message || e);
+      return 0;
+    } finally {
+      isScraping = false;
+      currentScrapePromise = null;
+    }
+  })();
+
+  return currentScrapePromise;
 }
 
 // --- ROUTES ---
 app.post("/api/register-push-token", (req, res) => {
   const { token } = req.body;
-  if (!token || typeof token !== "string")
+  if (!token || typeof token !== "string") {
     return res.status(400).json({ error: "Invalid token" });
+  }
   pushTokens.add(token);
   console.log(`[Push] Token registered. Total: ${pushTokens.size}`);
   res.json({ success: true });
@@ -132,10 +159,13 @@ app.delete("/api/register-push-token", (req, res) => {
 });
 
 app.get("/api/vehicles", (req, res) => {
+  // Ovdje je O(n log n) sort; na ~1k elemenata je OK.
+  // Bitno: API endpoint ne smije čekati scrape – zato smo riješili overlap.
   const vehicles = Array.from(vehicleCache.values())
     .filter((v) => v.isPrivate === true)
     .sort((a, b) => new Date(b.firstSeenAt) - new Date(a.firstSeenAt))
     .slice(0, 100);
+
   res.json({ vehicles, lastScrapeTime });
 });
 
@@ -143,6 +173,7 @@ app.get("/api/vehicles/new", (req, res) => {
   const vehicles = Array.from(vehicleCache.values())
     .filter((v) => newVehicleIds.has(v.id))
     .sort((a, b) => new Date(b.firstSeenAt) - new Date(a.firstSeenAt));
+
   res.json({ vehicles, count: vehicles.length });
 });
 
@@ -156,12 +187,15 @@ app.post("/api/vehicles/mark-seen", (req, res) => {
 });
 
 app.post("/api/scrape", async (req, res) => {
-  const newCount = await scrapeAndStore();
+  // KRITIČNO: ne zovi scrapeAndStore() direktno – uvijek safe wrapper
+  const newCount = await scrapeAndStoreSafe();
+
   res.json({
     success: true,
     newCount,
     totalVehicles: vehicleCache.size,
     lastScrapeTime,
+    isScraping,
   });
 });
 
@@ -172,6 +206,7 @@ app.get("/api/health", (req, res) => {
     totalVehicles: vehicleCache.size,
     newVehicles: newVehicleIds.size,
     registeredPushTokens: pushTokens.size,
+    isScraping,
   });
 });
 
@@ -183,13 +218,14 @@ app.get("/", (req, res) => {
       "/api/vehicles/new",
       "/api/health",
       "/api/register-push-token",
+      "/api/scrape",
     ],
     status: "running",
     registeredPushTokens: pushTokens.size,
+    isScraping,
   });
 });
 
-// --- SCRAPE INTERVAL ---
 function getNextScrapeDelay() {
   const now = new Date();
   const h = now.getHours();
@@ -198,41 +234,38 @@ function getNextScrapeDelay() {
   const isNight = h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 45);
 
   if (isNight) {
-    // noćni scraping: ~40 minuta
     const interval = 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
     console.log(
-      `[${now.toLocaleTimeString()}] 🌙 Night scrape in ${Math.round(interval / 60000)} min`
+      `[${now.toLocaleTimeString()}] Night scrape in ${Math.round(interval / 60000)} min`,
     );
     return interval;
   }
 
-  // dnevni scraping: 2-5s
+  // Day: 2–5s (tvoj original)
   const interval = 2000 + Math.random() * 3000;
   console.log(
-    `[${now.toLocaleTimeString()}] ☀️ Day scrape in ${Math.round(interval / 1000)}s`
+    `[${now.toLocaleTimeString()}] Day scrape in ${Math.round(interval / 1000)}s`,
   );
   return interval;
 }
 
 // --- START SERVER & SCRAPER LOOP ---
-async function startServer() {
-  await scrapeAndStore();
+function startScrapeLoop() {
+  const tick = async () => {
+    await scrapeAndStoreSafe();
+    setTimeout(tick, getNextScrapeDelay());
+  };
+  tick();
+}
 
-  async function scheduledScrape() {
-    try {
-      await scrapeAndStore();
-    } catch (e) {
-      console.error("Scrape error:", e.message);
-    }
-    const nextDelay = getNextScrapeDelay();
-    setTimeout(scheduledScrape, nextDelay);
-  }
-
-  scheduledScrape();
-
+function startServer() {
+  // 1) Server odmah sluša (ne blokira se na scrape)
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Backend] API running on port ${PORT}`);
   });
+
+  // 2) Start scraping loop (prvi tick odmah)
+  startScrapeLoop();
 }
 
-startServer().catch(console.error);
+startServer();
