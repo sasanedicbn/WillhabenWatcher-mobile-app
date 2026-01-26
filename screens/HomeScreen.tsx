@@ -24,8 +24,8 @@ import {
 import * as Notifications from "expo-notifications";
 
 // Danju agresivno (može), noću rijetko
-const DAY_MIN_INTERVAL = 1500;
-const DAY_MAX_INTERVAL = 3000;
+const DAY_MIN_INTERVAL = 500;
+const DAY_MAX_INTERVAL = 1200;
 
 function computeNextInterval(): number {
   const now = new Date();

@@ -1,12 +1,5 @@
-import React, { useState } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Alert,
-  Platform,
-} from "react-native";
+import React, { useState, useMemo } from "react";
+import { View, StyleSheet, TouchableOpacity, Modal, Alert } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
@@ -26,6 +19,7 @@ import { useRadioMode } from "@/context/RadioModeContext";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { Vehicle } from "@/services/api";
 import { DassSchnelleSearch } from "./DasSchneleSearcher";
+import { Platform } from "react-native";
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -44,13 +38,14 @@ const AnimatedView = Animated.createAnimatedComponent(View);
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const { isDark } = useTheme();
   const { setCurrentPhone } = usePhone();
-  const [sellerName, setSellerName] = useState<string | null>(null);
   const { isRadioModeOn } = useRadioMode();
   const colors = isDark ? Colors.dark : Colors.light;
 
+  const [sellerName, setSellerName] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
   const scale = useSharedValue(1);
   const hasPhone = Boolean(vehicle.phone);
-  const [modalVisible, setModalVisible] = useState(false);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -66,7 +61,6 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 
   const handleImagePress = async () => {
     const nameForSearch = sellerName || vehicle.sellerName || "";
-
     const query = encodeURIComponent(`${nameForSearch} Telefonnummer`);
     const googleUrl = `https://www.google.com/search?q=${query}`;
 
@@ -110,7 +104,8 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
     setModalVisible(true);
   };
 
-  const messageTemplate = `Hallöchen 🥰🥰🥰 haben sie kurz Zeit für ein Telefonat er gefällt mir und der preis passt mir auch 06643972640.`;
+  const messageTemplate =
+    "Hallöchen 🥰🥰🥰 haben sie kurz Zeit für ein Telefonat er gefällt mir und der preis passt mir auch 06643972640.";
 
   const willhabenUrl =
     vehicle.willhabenUrl ||
@@ -119,48 +114,154 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       "",
     )}`;
 
+  // Injected JS: stable + non-invasive
   const injectedJS = `
-  (function () {
-    const MESSAGE = ${JSON.stringify(messageTemplate)};
+(function () {
+  const MESSAGE = ${JSON.stringify(messageTemplate)};
 
-    function fillMessage() {
-      const textarea = document.querySelector('#mailContent');
-      if (textarea) {
-        textarea.focus();
-        textarea.value = MESSAGE;
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    }
+  // Ako ne želiš da automatski otvara tastaturu, stavi false
+  const DO_FOCUS = true;
 
-    function sendSellerName() {
-  if (window.__SELLER_SENT__) return;
+  function setNativeValue(el, value) {
+    const proto =
+      el.tagName === 'TEXTAREA'
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
 
-  const el = document.querySelector(
-    '[data-testid="top-contact-box-seller-name"]'
-  );
+    const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+    if (desc && desc.set) desc.set.call(el, value);
+    else el.value = value;
+  }
 
-  if (el && el.innerText) {
-    window.__SELLER_SENT__ = true;
+  function fire(el, type) {
+    el.dispatchEvent(new Event(type, { bubbles: true }));
+  }
 
-    window.ReactNativeWebView.postMessage(
-      JSON.stringify({
-        type: 'SELLER_NAME',
-        value: el.innerText.trim(),
-      })
+  function getTextarea() {
+    return (
+      document.querySelector('#mailContent') ||
+      document.querySelector('textarea[name="mailContent"]')
     );
   }
-}
 
+  function sendSellerName() {
+    if (window.__SELLER_SENT__) return;
+    const el = document.querySelector('[data-testid="top-contact-box-seller-name"]');
+    if (el && el.innerText) {
+      window.__SELLER_SENT__ = true;
+      window.ReactNativeWebView?.postMessage(
+        JSON.stringify({ type: 'SELLER_NAME', value: el.innerText.trim() })
+      );
+    }
+  }
 
-    let tries = 0;
-    const interval = setInterval(() => {
-      tries++;
-      fillMessage();
-      sendSellerName();
-      if (tries > 15) clearInterval(interval);
-    }, 600);
-  })();
-  true;
+  let programmatic = false;
+  let filledOnce = false;
+
+  function hookUserTyping(textarea) {
+    if (textarea.dataset.__hooked) return;
+    textarea.dataset.__hooked = '1';
+
+    textarea.addEventListener('input', () => {
+      if (!programmatic) textarea.dataset.__userTouched = '1';
+    });
+    textarea.addEventListener('keydown', () => {
+      textarea.dataset.__userTouched = '1';
+    });
+  }
+
+  function scrollToTextarea(textarea) {
+    // samo jednom da ne "drma"
+    if (textarea.dataset.__scrolled === '1') return;
+    textarea.dataset.__scrolled = '1';
+
+    // mali delay da DOM “slegne” i da value već bude upisan
+    setTimeout(() => {
+      try {
+        textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch {}
+
+      if (!DO_FOCUS) return;
+
+      // još malo kasnije fokus -> manje šanse da Willhaben "pregazi" value
+      setTimeout(() => {
+        try {
+          textarea.focus();
+          // cursor na kraj
+          const len = (textarea.value || '').length;
+          textarea.setSelectionRange(len, len);
+        } catch {}
+      }, 200);
+    }, 250);
+  }
+
+  function fillMessage() {
+    const textarea = getTextarea();
+    if (!textarea) return false;
+
+    hookUserTyping(textarea);
+
+    // Ako je korisnik već kucao, više ne diraj.
+    if (textarea.dataset.__userTouched === '1') {
+      filledOnce = true;
+      return true;
+    }
+
+    // Ako već ima sadržaj, ne diraj.
+    const current = (textarea.value || '').trim();
+    if (current.length > 0) {
+      filledOnce = true;
+      scrollToTextarea(textarea);
+      return true;
+    }
+
+    programmatic = true;
+    setNativeValue(textarea, MESSAGE);
+    fire(textarea, 'input');
+    fire(textarea, 'change');
+    programmatic = false;
+
+    filledOnce = true;
+
+    window.ReactNativeWebView?.postMessage(
+      JSON.stringify({ type: 'MSG_INJECTED', ok: true })
+    );
+
+    // tek nakon što je value sigurno postavljen -> scroll/focus
+    scrollToTextarea(textarea);
+
+    return true;
+  }
+
+  // 1) odmah
+  fillMessage();
+  sendSellerName();
+
+  // 2) retry dok se forma ne pojavi
+  let tries = 0;
+  const interval = setInterval(() => {
+    tries++;
+    const ok = fillMessage();
+    sendSellerName();
+    if (ok || tries > 80) clearInterval(interval);
+  }, 300);
+
+  // 3) Observer samo dok jednom ne uspije, pa se gasi
+  const mo = new MutationObserver(() => {
+    if (filledOnce) return;
+    fillMessage();
+    sendSellerName();
+  });
+
+  try {
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+  } catch {}
+
+  setTimeout(() => {
+    try { mo.disconnect(); } catch {}
+  }, 15000);
+})();
+true;
 `;
 
   const formatPrice = (price: number | null) =>
@@ -176,7 +277,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
     mileage ? new Intl.NumberFormat("de-AT").format(mileage) + " km" : "";
 
   const getMetadata = () => {
-    const parts = [];
+    const parts: string[] = [];
     if (vehicle.year) parts.push(vehicle.year.toString());
     if (vehicle.mileage) parts.push(formatMileage(vehicle.mileage));
     if (vehicle.fuelType) parts.push(vehicle.fuelType);
@@ -299,6 +400,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
         <View style={{ flex: 1 }}>
           <WebView
             source={{ uri: willhabenUrl }}
+            injectedJavaScriptBeforeContentLoaded={injectedJS}
             injectedJavaScript={injectedJS}
             javaScriptEnabled
             domStorageEnabled
@@ -306,10 +408,8 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
             onMessage={(event) => {
               try {
                 const data = JSON.parse(event.nativeEvent.data);
-                if (data.type === "SELLER_NAME") {
-                  setSellerName(data.value);
-                }
-              } catch (e) {}
+                if (data.type === "SELLER_NAME") setSellerName(data.value);
+              } catch {}
             }}
           />
 
