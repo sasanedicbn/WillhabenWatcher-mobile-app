@@ -26,19 +26,18 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#1E40AF"
-        }
-      ],
-      "expo-web-browser",
-      "expo-notifications",
-      "react-native-reanimated/plugin"
-    ],
+  [
+    "expo-splash-screen",
+    {
+      "image": "./assets/images/splash-icon.png",
+      "imageWidth": 200,
+      "resizeMode": "contain",
+      "backgroundColor": "#1E40AF"
+    }
+  ],
+  "expo-web-browser",
+  "expo-notifications"
+],
     "experiments": {},
     "extra": {
       "eas": {
