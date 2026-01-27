@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "willhabencars",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.willhabencars.app"
@@ -26,18 +26,19 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-  [
-    "expo-splash-screen",
-    {
-      "image": "./assets/images/splash-icon.png",
-      "imageWidth": 200,
-      "resizeMode": "contain",
-      "backgroundColor": "#1E40AF"
-    }
-  ],
-  "expo-web-browser",
-  "expo-notifications"
-],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#1E40AF"
+        }
+      ],
+      "expo-web-browser",
+      "expo-notifications",
+      "react-native-reanimated/plugin"
+    ],
     "experiments": {},
     "extra": {
       "eas": {
