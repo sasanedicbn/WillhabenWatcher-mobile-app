@@ -42,20 +42,36 @@ function fetchPage(url, baseUrl = null) {
 
     const protocol = parsedUrl.protocol === "https:" ? https : http;
 
-    protocol
-      .get(options, (res) => {
-        if ([301, 302].includes(res.statusCode)) {
-          fetchPage(res.headers.location, fullUrl).then(resolve).catch(reject);
-          return;
-        }
+    const req = protocol.get(options, (res) => {
+      // Redirects (bitno: res.resume() da ne curi socket/memorija)
+      if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
+        const next = res.headers.location;
+        res.resume();
+        fetchPage(next, fullUrl).then(resolve).catch(reject);
+        return;
+      }
 
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => resolve(data));
-      })
-      .on("error", reject);
+      // Fail-fast na 4xx/5xx
+      if (res.statusCode && res.statusCode >= 400) {
+        res.resume();
+        resolve("");
+        return;
+      }
+
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => resolve(data));
+    });
+
+    // Timeout (sprječava “zaleđivanje”)
+    req.setTimeout(15000, () => {
+      req.destroy(new Error("Request timeout after 15000ms"));
+    });
+
+    req.on("error", reject);
   });
 }
+
 function extractPrice(text) {
   if (!text) return null;
   const match = text.replace(/[^\d]/g, "");
@@ -124,8 +140,11 @@ function parseVehiclesFromHTML(html) {
       ? `https://www.willhaben.at${linkMatch[1]}`
       : null;
 
+    const stableId = willhabenPath
+      ? `wh-${willhabenPath}`
+      : `wh-${title}-${price || "na"}`;
     vehicles.push({
-      id: `wh-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      id: stableId,
       title,
       price,
       willhabenUrl,

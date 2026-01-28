@@ -8,24 +8,31 @@ export async function fetchPageIPRoyal(url: string) {
     throw new Error("IPRoyal ENV variables are missing");
   }
 
-  console.log("USING IPROYAL:", proxyUrl);
 
   const agent = new ProxyAgent(proxyUrl);
 
-  const res = await fetch(url, {
-    dispatcher: agent,
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120",
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      "Accept-Language": "de-AT,de;q=0.9,en;q=0.8",
-    },
-  });
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 15000);
 
-  if (!res.ok) {
-    throw new Error(`IPRoyal status ${res.status}`);
+  try {
+    const res = await fetch(url, {
+      dispatcher: agent,
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "de-AT,de;q=0.9,en;q=0.8",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`IPRoyal status ${res.status}`);
+    }
+
+    return await res.text();
+  } finally {
+    clearTimeout(t);
   }
-
-  return res.text();
 }
