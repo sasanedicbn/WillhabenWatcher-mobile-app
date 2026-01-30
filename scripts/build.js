@@ -17,7 +17,6 @@ function exitWithError(message) {
 function setupSignalHandlers() {
   const cleanup = () => {
     if (metroProcess) {
-      console.log("Cleaning up Metro process...");
       metroProcess.kill();
     }
     process.exit(0);
@@ -31,13 +30,11 @@ function setupSignalHandlers() {
 function getDeploymentUrl() {
   if (process.env.REPLIT_INTERNAL_APP_DOMAIN) {
     const url = `https://${process.env.REPLIT_INTERNAL_APP_DOMAIN}`;
-    console.log("Using REPLIT_INTERNAL_APP_DOMAIN:", url);
     return url;
   }
 
   if (process.env.REPLIT_DEV_DOMAIN) {
     const url = `https://${process.env.REPLIT_DEV_DOMAIN}`;
-    console.log("Using REPLIT_DEV_DOMAIN:", url);
     return url;
   }
 
@@ -48,7 +45,6 @@ function getDeploymentUrl() {
 }
 
 function prepareDirectories(timestamp) {
-  console.log("Preparing build directories...");
 
   if (fs.existsSync("static-build")) {
     fs.rmSync("static-build", { recursive: true });
@@ -65,11 +61,9 @@ function prepareDirectories(timestamp) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  console.log("Build:", timestamp);
 }
 
 function clearMetroCache() {
-  console.log("Clearing Metro cache...");
 
   const cacheDirs = [
     ...fs.globSync(".metro-cache"),
@@ -79,8 +73,6 @@ function clearMetroCache() {
   for (const dir of cacheDirs) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
-
-  console.log("Cache cleared");
 }
 
 async function checkMetroHealth() {
@@ -97,8 +89,6 @@ async function startMetro() {
   if (isRunning) {
     return;
   }
-
-  console.log("Starting Metro...");
   metroProcess = spawn("npm", ["run", "dev"], {
     stdio: ["ignore", "ignore", "ignore"],
     detached: false,
@@ -108,7 +98,6 @@ async function startMetro() {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const healthy = await checkMetroHealth();
     if (healthy) {
-      console.log("Metro ready");
       return;
     }
   }
@@ -180,7 +169,6 @@ async function downloadManifest(platform) {
 }
 
 async function downloadBundlesAndManifests(timestamp) {
-  console.log("Downloading bundles and manifests...");
 
   try {
     const [, , iosManifest, androidManifest] = await Promise.all([
@@ -189,7 +177,6 @@ async function downloadBundlesAndManifests(timestamp) {
       downloadManifest("ios"),
       downloadManifest("android"),
     ]);
-    console.log("Downloaded");
     return { ios: iosManifest, android: androidManifest };
   } catch (error) {
     exitWithError(`Download failed: ${error.message}`);
@@ -270,7 +257,6 @@ async function downloadAssets(assets, timestamp) {
     return 0;
   }
 
-  console.log("Downloading assets...");
   let successCount = 0;
   const failures = [];
 
@@ -325,7 +311,6 @@ async function downloadAssets(assets, timestamp) {
     exitWithError(errorMsg);
   }
 
-  console.log(`Downloaded ${successCount} assets`);
   return successCount;
 }
 
@@ -367,7 +352,6 @@ function updateBundleUrls(timestamp, baseUrl) {
 
   updateForPlatform("ios");
   updateForPlatform("android");
-  console.log("Updated bundle URLs");
 }
 
 function updateManifests(manifests, timestamp, baseUrl, assetsByHash) {
@@ -409,7 +393,6 @@ function updateManifests(manifests, timestamp, baseUrl, assetsByHash) {
 
   updateForPlatform("ios", manifests.ios);
   updateForPlatform("android", manifests.android);
-  console.log("Manifests updated");
 }
 
 function createLandingPage(baseUrl) {
@@ -424,11 +407,9 @@ function createLandingPage(baseUrl) {
     .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl);
 
   fs.writeFileSync(path.join("static-build", "index.html"), html);
-  console.log("Complete");
 }
 
 async function main() {
-  console.log("Building static Expo Go deployment...");
 
   setupSignalHandlers();
 
@@ -441,9 +422,7 @@ async function main() {
   await startMetro();
   const manifests = await downloadBundlesAndManifests(timestamp);
 
-  console.log("Processing assets...");
   const assets = extractAssets(timestamp);
-  console.log("Found", assets.length, "unique asset(s)");
 
   const assetsByHash = new Map();
   for (const asset of assets) {
@@ -459,11 +438,9 @@ async function main() {
     updateBundleUrls(timestamp, baseUrl);
   }
 
-  console.log("Updating manifests and creating landing page...");
   updateManifests(manifests, timestamp, baseUrl, assetsByHash);
   createLandingPage(baseUrl);
 
-  console.log("Build complete! Deploy to:", baseUrl);
 
   if (metroProcess) {
     metroProcess.kill();

@@ -1,8 +1,5 @@
 const { spawn } = require('child_process');
 
-console.log('=================================');
-console.log('Starting Willhaben Cars App...');
-console.log('=================================\n');
 
 const backend = spawn('node', ['server/index.js'], {
   cwd: process.cwd(),
@@ -21,9 +18,7 @@ backend.on('exit', (code) => {
 });
 
 setTimeout(() => {
-  console.log('\n=================================');
-  console.log('Starting Expo Metro bundler...');
-  console.log('=================================\n');
+
   
   const expo = spawn('npx', ['expo', 'start'], {
     cwd: process.cwd(),
@@ -41,20 +36,17 @@ setTimeout(() => {
   });
 
   expo.on('exit', (code) => {
-    console.log('Expo exited with code:', code);
     backend.kill();
     process.exit(code || 0);
   });
 }, 5000);
 
 process.on('SIGINT', () => {
-  console.log('\nShutting down...');
   backend.kill();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('\nShutting down...');
   backend.kill();
   process.exit(0);
 });
