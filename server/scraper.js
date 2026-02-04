@@ -43,12 +43,25 @@ function fetchPage(url, baseUrl = null) {
     const protocol = parsedUrl.protocol === "https:" ? https : http;
 
     let finished = false;
+    let req;
+
+    const HARD_TIMEOUT_MS = 20000;
+    const hardTimer = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      try {
+        req?.destroy(new Error(`Hard timeout after ${HARD_TIMEOUT_MS}ms`));
+      } catch {}
+      reject(new Error(`Hard timeout after ${HARD_TIMEOUT_MS}ms`));
+    }, HARD_TIMEOUT_MS);
+
     const doneResolve = (val) => {
       if (finished) return;
       finished = true;
       clearTimeout(hardTimer);
       resolve(val);
     };
+
     const doneReject = (err) => {
       if (finished) return;
       finished = true;
@@ -56,28 +69,16 @@ function fetchPage(url, baseUrl = null) {
       reject(err);
     };
 
-    // HARD timeout: prekida request čak i ako server “trickle-a” data
-    const HARD_TIMEOUT_MS = 20000;
-    const hardTimer = setTimeout(() => {
-      try {
-        req.destroy(new Error(`Hard timeout after ${HARD_TIMEOUT_MS}ms`));
-      } catch (e) {
-        // ako req nije spreman, samo reject
-        doneReject(new Error(`Hard timeout after ${HARD_TIMEOUT_MS}ms`));
-      }
-    }, HARD_TIMEOUT_MS);
-
-    const req = protocol.get(options, (res) => {
-      // Redirects (bitno: res.resume() da ne curi socket/memorija)
+    req = protocol.get(options, (res) => {
+      // Redirects: obavezno res.resume() da ne curi socket
       if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
         const next = res.headers.location;
         res.resume();
-        clearTimeout(hardTimer);
         fetchPage(next, fullUrl).then(doneResolve).catch(doneReject);
         return;
       }
 
-      // Fail-fast na 4xx/5xx
+      // Fail-fast 4xx/5xx
       if (res.statusCode && res.statusCode >= 400) {
         res.resume();
         doneResolve("");
@@ -91,7 +92,7 @@ function fetchPage(url, baseUrl = null) {
       res.on("error", doneReject);
     });
 
-    // Socket inactivity timeout (tvoj postojeći)
+    // inactivity timeout
     req.setTimeout(15000, () => {
       req.destroy(new Error("Request timeout after 15000ms"));
     });
