@@ -42,61 +42,33 @@ function fetchPage(url, baseUrl = null) {
 
     const protocol = parsedUrl.protocol === "https:" ? https : http;
 
-    let finished = false;
-    const doneResolve = (val) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(hardTimer);
-      resolve(val);
-    };
-    const doneReject = (err) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(hardTimer);
-      reject(err);
-    };
-
-    // HARD timeout: prekida request čak i ako server “trickle-a” data
-    const HARD_TIMEOUT_MS = 20000;
-    const hardTimer = setTimeout(() => {
-      try {
-        req.destroy(new Error(`Hard timeout after ${HARD_TIMEOUT_MS}ms`));
-      } catch (e) {
-        // ako req nije spreman, samo reject
-        doneReject(new Error(`Hard timeout after ${HARD_TIMEOUT_MS}ms`));
-      }
-    }, HARD_TIMEOUT_MS);
-
     const req = protocol.get(options, (res) => {
       // Redirects (bitno: res.resume() da ne curi socket/memorija)
       if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
         const next = res.headers.location;
         res.resume();
-        clearTimeout(hardTimer);
-        fetchPage(next, fullUrl).then(doneResolve).catch(doneReject);
+        fetchPage(next, fullUrl).then(resolve).catch(reject);
         return;
       }
 
       // Fail-fast na 4xx/5xx
       if (res.statusCode && res.statusCode >= 400) {
         res.resume();
-        doneResolve("");
+        resolve("");
         return;
       }
 
       let data = "";
       res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => doneResolve(data));
-      res.on("aborted", () => doneReject(new Error("Response aborted")));
-      res.on("error", doneReject);
+      res.on("end", () => resolve(data));
     });
 
-    // Socket inactivity timeout (tvoj postojeći)
+    // Timeout (sprječava “zaleđivanje”)
     req.setTimeout(15000, () => {
       req.destroy(new Error("Request timeout after 15000ms"));
     });
 
-    req.on("error", doneReject);
+    req.on("error", reject);
   });
 }
 
@@ -164,19 +136,13 @@ function parseVehiclesFromHTML(html) {
     );
 
     const linkMatch = articleHtml.match(/href="(\/iad\/[^"]+)"/);
-    const willhabenPath = linkMatch ? linkMatch[1] : null;
-
-    // ukloni query string da ID bude stabilan
-    const cleanPath = willhabenPath ? willhabenPath.split("?")[0] : null;
-
-    const willhabenUrl = cleanPath
-      ? `https://www.willhaben.at${cleanPath}`
+    const willhabenUrl = linkMatch
+      ? `https://www.willhaben.at${linkMatch[1]}`
       : null;
 
-    const stableId = cleanPath
-      ? `wh-${cleanPath}`
+    const stableId = willhabenPath
+      ? `wh-${willhabenPath}`
       : `wh-${title}-${price || "na"}`;
-
     vehicles.push({
       id: stableId,
       title,
