@@ -31,7 +31,7 @@ export function DassSchnelleSearch({ vehicle }: { vehicle: any }) {
         where.dispatchEvent(new Event('input', { bubbles: true }));
 
         // ne klikamo odmah submita da se ne pretražuje automatski
-        // button.click(); // ako želiš da odmah klikne search, možeš otkomentirati
+        button.click(); // ako želiš da odmah klikne search, možeš otkomentirati
       }
     })();
     true;
