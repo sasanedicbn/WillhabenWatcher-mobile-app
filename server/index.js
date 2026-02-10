@@ -3,7 +3,7 @@ import cors from "cors";
 import { scrapeWillhaben } from "./scraper.js";
 
 const app = express();
-const PORT = process.env.API_PORT || 8083;
+const PORT = process.env.PORT || process.env.API_PORT || 8083;
 
 app.use(cors());
 app.use(express.json());
