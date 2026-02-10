@@ -49,6 +49,9 @@ async function sendPushNotifications(newVehicles) {
   }
 
   try {
+    console.log(`[Push] tokens=${pushTokens.size} messages=${messages.length}`);
+    console.log(`[Push] sample to= ${messages[0]?.to}`);
+
     const response = await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: {
@@ -59,23 +62,41 @@ async function sendPushNotifications(newVehicles) {
       body: JSON.stringify(messages),
     });
 
-    const result = await response.json();
-    console.log(`[Push] Sent ${messages.length} notifications`);
+    const resultText = await response.text(); // ✅ uzmi raw
+    console.log("[Push] Expo HTTP status:", response.status);
+    console.log("[Push] Expo raw response:", resultText);
 
-    // Expo odgovara sa "data" kao niz ticket-a u mnogim slučajevima
+    let result;
+    try {
+      result = JSON.parse(resultText);
+    } catch {
+      console.log("[Push] Could not parse Expo response as JSON");
+      return;
+    }
+
+    // Expo odgovara sa data: [{status,id,message,details}]
     if (Array.isArray(result?.data)) {
       result.data.forEach((ticket, index) => {
+        console.log(`[Push] ticket[${index}]`, ticket);
+
         if (ticket?.status === "error") {
-          console.log(`[Push] Error: ${ticket.message || "unknown"}`);
+          console.log(
+            `[Push] ERROR ticket message: ${ticket.message || "unknown"}`,
+          );
+          console.log(`[Push] ERROR details:`, ticket.details || null);
+
+          // Clean up invalid tokens
           if (ticket.details?.error === "DeviceNotRegistered") {
             const badToken = messages[index]?.to;
             if (badToken) {
               pushTokens.delete(badToken);
-              console.log(`[Push] Removed invalid token`);
+              console.log(`[Push] Removed invalid token: ${badToken}`);
             }
           }
         }
       });
+    } else {
+      console.log("[Push] Unexpected Expo response shape:", result);
     }
   } catch (error) {
     console.error(
@@ -150,6 +171,18 @@ app.post("/api/register-push-token", (req, res) => {
   pushTokens.add(token);
   console.log(`[Push] Token registered. Total: ${pushTokens.size}`);
   res.json({ success: true });
+});
+
+app.post("/api/push-test", async (req, res) => {
+  const fake = {
+    id: "test-vehicle",
+    title: "TEST vozilo",
+    price: 9999,
+  };
+
+  await sendPushNotifications([fake]);
+
+  res.json({ ok: true, tokens: pushTokens.size });
 });
 
 app.delete("/api/register-push-token", (req, res) => {

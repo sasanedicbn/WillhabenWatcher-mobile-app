@@ -26,6 +26,7 @@ export const getBaseUrl = () => {
   return 'http://localhost:8083'; // za lokalno testiranje
 };
 
+
 // export function getApiBaseUrl() {
 //   if (Platform.OS === 'web') {
 //     if (typeof window !== 'undefined' && window.location) {

@@ -90,20 +90,26 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
 
 async function sendTokenToServer(token: string): Promise<void> {
   try {
-    const response = await fetch(`${getBaseUrl()}/api/register-push-token`, {
+    const url = `${getBaseUrl()}/api/register-push-token`;
+    console.log("[Push] Registering token to:", url);
+
+    const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     });
 
+    const text = await response.text(); // da vidiš šta backend vraća
     if (response.ok) {
-      console.log("Push token registered with server");
+      console.log("✅ Push token registered with server:", text);
+    } else {
+      console.log("❌ register-push-token failed:", response.status, text);
     }
-    console.log("❌ register-push-token failed:", response.status);
-  } catch (error) {
-    console.log("Failed to register push token with server:", error);
+  } catch (error: any) {
+    console.log(
+      "❌ Failed to register push token with server:",
+      error?.message || error,
+    );
   }
 }
 
