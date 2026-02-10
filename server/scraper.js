@@ -3,7 +3,7 @@ import https from "https";
 import { HttpProxyAgent } from "http-proxy-agent";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { getNextProxy } from "./proxy.js";
-import { fetchPageIPRoyal } from "./fetchPageIPRoyal.ts";
+import { fetchPageIPRoyal } from "./fetchPageIPRoyal.js";
 
 function fetchPage(url, baseUrl = null) {
   return new Promise((resolve, reject) => {

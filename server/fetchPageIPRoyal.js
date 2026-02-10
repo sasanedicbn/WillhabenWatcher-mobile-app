@@ -1,13 +1,12 @@
 import "dotenv/config";
 import { ProxyAgent, fetch } from "undici";
 
-export async function fetchPageIPRoyal(url: string) {
+export async function fetchPageIPRoyal(url) {
   const proxyUrl = `http://${process.env.IPROYAL_USER}:${process.env.IPROYAL_PASS}@${process.env.IPROYAL_HOST}:${process.env.IPROYAL_PORT}`;
 
   if (proxyUrl.includes("undefined")) {
     throw new Error("IPRoyal ENV variables are missing");
   }
-
 
   const agent = new ProxyAgent(proxyUrl);
 
