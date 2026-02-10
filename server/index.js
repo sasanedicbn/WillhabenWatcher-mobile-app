@@ -290,6 +290,12 @@ function startScrapeLoop() {
   };
   tick();
 }
+console.log(
+  "[Boot] env PORT =",
+  process.env.PORT,
+  "API_PORT =",
+  process.env.API_PORT,
+);
 
 function startServer() {
   // 1) Server odmah sluša (ne blokira se na scrape)
