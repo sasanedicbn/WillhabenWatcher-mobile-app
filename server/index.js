@@ -173,7 +173,7 @@ app.post("/api/register-push-token", (req, res) => {
   res.json({ success: true });
 });
 
-app.post("/api/push-test", async (req, res) => {
+app.get("/api/push-test", async (req, res) => {
   const fake = {
     id: "test-vehicle",
     title: "TEST vozilo",
