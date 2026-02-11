@@ -61,7 +61,23 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 
   const handleImagePress = async () => {
     const nameForSearch = sellerName || vehicle.sellerName || "";
-    const query = encodeURIComponent(`${nameForSearch} Telefonnummer`);
+
+    // Pripremi lokaciju (postanski broj + grad)
+    let locationForSearch = "";
+    if (vehicle.postcode || vehicle.location) {
+      const postcode = vehicle.postcode || "";
+      const location = vehicle.location || "";
+      locationForSearch = `${postcode} ${location}`.trim();
+    }
+
+    // Kombinuj sve dijelove
+    const searchParts = [
+      nameForSearch,
+      locationForSearch,
+      "Telefonnummer",
+    ].filter((part) => part && part.trim() !== ""); // Ukloni prazne dijelove
+
+    const query = encodeURIComponent(searchParts.join(" "));
     const googleUrl = `https://www.google.com/search?q=${query}`;
 
     try {
