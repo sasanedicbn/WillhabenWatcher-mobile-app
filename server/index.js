@@ -63,22 +63,17 @@ async function sendPushNotifications(newVehicles) {
     });
 
     const resultText = await response.text(); // ✅ uzmi raw
-    console.log("[Push] Expo HTTP status:", response.status);
-    console.log("[Push] Expo raw response:", resultText);
 
     let result;
     try {
       result = JSON.parse(resultText);
     } catch {
-      console.log("[Push] Could not parse Expo response as JSON");
       return;
     }
 
     // Expo odgovara sa data: [{status,id,message,details}]
     if (Array.isArray(result?.data)) {
       result.data.forEach((ticket, index) => {
-        console.log(`[Push] ticket[${index}]`, ticket);
-
         if (ticket?.status === "error") {
           console.log(
             `[Push] ERROR ticket message: ${ticket.message || "unknown"}`,
@@ -90,7 +85,6 @@ async function sendPushNotifications(newVehicles) {
             const badToken = messages[index]?.to;
             if (badToken) {
               pushTokens.delete(badToken);
-              console.log(`[Push] Removed invalid token: ${badToken}`);
             }
           }
         }
@@ -132,7 +126,6 @@ async function scrapeAndStore() {
   isFirstScrape = false;
 
   if (newlyFoundVehicles.length > 0) {
-    console.log(`[Backend] ${newlyFoundVehicles.length} new vehicles`);
     // Može biti sporije, ali je deterministično i bez overlap-a
     await sendPushNotifications(newlyFoundVehicles);
   }
@@ -256,8 +249,8 @@ function getNextScrapeDelay() {
     return interval;
   }
 
-  // Day: 2–5s (tvoj original)
-  const interval = 2000 + Math.random() * 3000;
+  // Day: 2–4s (tvoj original)
+  const interval = 2000 + Math.random() * 2000;
   console.log(
     `[${now.toLocaleTimeString()}] Day scrape in ${Math.round(interval / 1000)}s`,
   );
