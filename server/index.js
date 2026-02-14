@@ -173,24 +173,6 @@ app.post("/api/register-push-token", (req, res) => {
   res.json({ success: true });
 });
 
-app.get("/api/push-test", async (req, res) => {
-  const fake = {
-    id: "test-vehicle",
-    title: "TEST vozilo",
-    price: 9999,
-  };
-
-  await sendPushNotifications([fake]);
-
-  res.json({ ok: true, tokens: pushTokens.size });
-});
-
-app.delete("/api/register-push-token", (req, res) => {
-  const { token } = req.body;
-  if (token) pushTokens.delete(token);
-  res.json({ success: true });
-});
-
 app.get("/api/vehicles", (req, res) => {
   // Ovdje je O(n log n) sort; na ~1k elemenata je OK.
   // Bitno: API endpoint ne smije čekati scrape – zato smo riješili overlap.

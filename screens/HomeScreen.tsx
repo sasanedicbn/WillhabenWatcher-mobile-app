@@ -13,7 +13,6 @@ import { ThemedText } from "@/components/ThemedText";
 import Spacer from "@/components/Spacer";
 import { Spacing, Colors } from "@/constants/theme";
 import { useTheme } from "@/hooks/useTheme";
-import { usePhone } from "@/context/PhoneContext";
 import { useNewCarSound } from "@/hooks/useNewCarSound";
 import {
   fetchNewVehicles,
@@ -22,6 +21,7 @@ import {
   Vehicle,
 } from "@/services/api";
 import * as Notifications from "expo-notifications";
+import { usePhone } from "@/context/usePhone";
 
 // Danju agresivno (može), noću rijetko
 const DAY_MIN_INTERVAL = 500;

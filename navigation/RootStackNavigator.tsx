@@ -11,9 +11,9 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { getCommonScreenOptions } from "@/navigation/screenOptions";
 import { useRadioMode } from "@/context/RadioModeContext";
-import { usePhone } from "@/context/PhoneContext";
 import { Spacing, Colors } from "@/constants/theme";
 import { Vehicle } from "@/services/api";
+import { usePhone } from "../context/usePhone";
 
 export type RootStackParamList = {
   Home: undefined;
@@ -48,12 +48,18 @@ function HeaderRight() {
 
   const handlePhoneCall = async () => {
     if (!isRadioModeOn) {
-      Alert.alert("Anrufmodus deaktiviert", "Aktiviere den Anrufmodus um anzurufen");
+      Alert.alert(
+        "Anrufmodus deaktiviert",
+        "Aktiviere den Anrufmodus um anzurufen",
+      );
       return;
     }
 
     if (!currentPhone) {
-      Alert.alert("Keine Nummer", "Keine Telefonnummer für dieses Fahrzeug verfügbar");
+      Alert.alert(
+        "Keine Nummer",
+        "Keine Telefonnummer für dieses Fahrzeug verfügbar",
+      );
       return;
     }
 
@@ -63,7 +69,10 @@ function HeaderRight() {
       if (supported) {
         await Linking.openURL(phoneUrl);
       } else {
-        Alert.alert("Fehler", "Anrufe werden auf diesem Gerät nicht unterstützt");
+        Alert.alert(
+          "Fehler",
+          "Anrufe werden auf diesem Gerät nicht unterstützt",
+        );
       }
     } catch (error) {
       Alert.alert("Fehler", "Anruf konnte nicht gestartet werden");
@@ -77,8 +86,10 @@ function HeaderRight() {
       onPress={handlePhoneCall}
       style={({ pressed }) => [
         styles.callButton,
-        { 
-          backgroundColor: isActive ? colors.success : colors.backgroundSecondary,
+        {
+          backgroundColor: isActive
+            ? colors.success
+            : colors.backgroundSecondary,
           opacity: pressed ? 0.7 : 1,
         },
       ]}
@@ -95,7 +106,12 @@ function HeaderRight() {
         size={18}
         color={isActive ? "#FFFFFF" : colors.textSecondary}
       />
-      <ThemedText style={[styles.callButtonText, { color: isActive ? "#FFFFFF" : colors.textSecondary }]}>
+      <ThemedText
+        style={[
+          styles.callButtonText,
+          { color: isActive ? "#FFFFFF" : colors.textSecondary },
+        ]}
+      >
         Pozovi
       </ThemedText>
     </Pressable>

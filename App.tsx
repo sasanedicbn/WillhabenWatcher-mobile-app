@@ -9,8 +9,8 @@ import { StatusBar } from "expo-status-bar";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RadioModeProvider } from "@/context/RadioModeContext";
-import { PhoneProvider } from "@/context/PhoneContext";
 import { NotificationProvider } from "@/context/NotificationContext";
+import { PhoneProviderSecond } from "./context/usePhone";
 
 export default function App() {
   return (
@@ -20,11 +20,11 @@ export default function App() {
           <KeyboardProvider>
             <NotificationProvider>
               <RadioModeProvider>
-                <PhoneProvider>
+                <PhoneProviderSecond>
                   <NavigationContainer>
                     <RootStackNavigator />
                   </NavigationContainer>
-                </PhoneProvider>
+                </PhoneProviderSecond>
               </RadioModeProvider>
             </NotificationProvider>
             <StatusBar style="auto" />

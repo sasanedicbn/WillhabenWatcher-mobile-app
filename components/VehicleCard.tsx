@@ -14,12 +14,13 @@ import { WebView } from "react-native-webview";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { usePhone } from "@/context/PhoneContext";
 import { useRadioMode } from "@/context/RadioModeContext";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { Vehicle } from "@/services/api";
 import { DassSchnelleSearch } from "./DasSchneleSearcher";
 import { Platform } from "react-native";
+import { PhoneInputModal } from "@/components/PhoneInputModal"; // ← DODATO
+import { usePhone } from "@/context/usePhone";
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -37,12 +38,13 @@ const AnimatedView = Animated.createAnimatedComponent(View);
 
 export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   const { isDark } = useTheme();
-  const { setCurrentPhone } = usePhone();
+  const { setCurrentPhone, currentPhone, isLoading } = usePhone(); // ← DODATO currentPhone, isLoading
   const { isRadioModeOn } = useRadioMode();
   const colors = isDark ? Colors.dark : Colors.light;
 
   const [sellerName, setSellerName] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [phoneModalVisible, setPhoneModalVisible] = useState(false); // ← DODATO
 
   const scale = useSharedValue(1);
   const hasPhone = Boolean(vehicle.phone);
@@ -75,7 +77,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       nameForSearch,
       locationForSearch,
       "Telefonnummer",
-    ].filter((part) => part && part.trim() !== ""); // Ukloni prazne dijelove
+    ].filter((part) => part && part.trim() !== "");
 
     const query = encodeURIComponent(searchParts.join(" "));
     const googleUrl = `https://www.google.com/search?q=${query}`;
@@ -88,8 +90,6 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
   };
 
   const handleCardPress = async () => {
-    setCurrentPhone(vehicle.phone || null);
-
     if (isRadioModeOn && hasPhone && vehicle.phone) {
       try {
         const phoneUrl = `tel:${vehicle.phone}`;
@@ -115,13 +115,30 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
     }
   };
 
+  // IZMJENJENO: handleMessagePress sa provjerom broja
   const handleMessagePress = () => {
-    setCurrentPhone(vehicle.phone || null);
+    if (!currentPhone) {
+      Alert.alert(
+        "Broj telefona nije unesen",
+        "Unesite vaš broj jednom i biće zapamćen na ovom telefonu.",
+        [
+          { text: "Odustani", style: "cancel" },
+          { text: "Unesi broj", onPress: () => setPhoneModalVisible(true) },
+        ],
+      );
+      return;
+    }
+
     setModalVisible(true);
   };
 
-  const messageTemplate =
-    "Hallöchen 🥰🥰🥰 haben sie kurz Zeit für ein Telefonat er gefällt mir und der preis passt mir auch 06643972640.";
+  // IZMJENJENO: dinamički template sa trenutnim brojem
+  const getMessageTemplate = () => {
+    const userPhone = currentPhone ?? "";
+    return `Hallöchen 🥰🥰🥰 haben Sie kurz Zeit für ein Telefonat? 
+Der Wagen gefällt mir und der Preis passt mir auch. 
+Meine Telefonnummer: ${userPhone}`;
+  };
 
   const willhabenUrl =
     vehicle.willhabenUrl ||
@@ -130,8 +147,11 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
       "",
     )}`;
 
-  // Injected JS: stable + non-invasive
-  const injectedJS = `
+  // IZMJENJENO: injectedJS sa useMemo i dinamičkim brojem
+  const injectedJS = useMemo(() => {
+    const messageTemplate = getMessageTemplate();
+
+    return `
 (function () {
   const MESSAGE = ${JSON.stringify(messageTemplate)};
 
@@ -279,6 +299,7 @@ export function VehicleCard({ vehicle, isNew }: VehicleCardProps) {
 })();
 true;
 `;
+  }, [currentPhone]); // ← VAŽNO: re-generiše se kad se promijeni broj
 
   const formatPrice = (price: number | null) =>
     price
@@ -308,6 +329,11 @@ true;
   };
 
   const placeholderImage = "https://via.placeholder.com/200x200.png?text=Auto";
+
+  // DODATO: loading state
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <>
@@ -411,7 +437,7 @@ true;
         </View>
       </AnimatedView>
 
-      {/* MODAL */}
+      {/* MODAL ZA WEBVIEW */}
       <Modal visible={modalVisible} animationType="slide">
         <View style={{ flex: 1 }}>
           <WebView
@@ -440,6 +466,16 @@ true;
           </TouchableOpacity>
         </View>
       </Modal>
+
+      {/* DODATO: MODAL ZA UNOS BROJA TELEFONA */}
+      <PhoneInputModal
+        visible={phoneModalVisible}
+        onClose={() => setPhoneModalVisible(false)}
+        onSaved={() => {
+          setPhoneModalVisible(false);
+          setModalVisible(true); // ✅ odmah otvori WebView poruku nakon unosa broja
+        }}
+      />
     </>
   );
 }

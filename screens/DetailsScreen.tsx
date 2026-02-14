@@ -15,8 +15,8 @@ import * as WebBrowser from "expo-web-browser";
 import { ThemedText } from "@/components/ThemedText";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { useTheme } from "@/hooks/useTheme";
-import { usePhone } from "@/context/PhoneContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { usePhone } from "@/context/usePhone";
 
 type DetailsScreenProps = NativeStackScreenProps<RootStackParamList, "Details">;
 
