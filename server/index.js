@@ -239,7 +239,7 @@ function getNextScrapeDelay() {
   const h = now.getHours();
   const m = now.getMinutes();
 
-  const isNight = h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 45);
+  const isNight = h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 50);
 
   if (isNight) {
     const interval = 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
