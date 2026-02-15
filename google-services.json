@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "539576108634",
+    "project_id": "willhabenwatcher-5c33d",
+    "storage_bucket": "willhabenwatcher-5c33d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:539576108634:android:5d2eac7578e57cb2aaba63",
+        "android_client_info": {
+          "package_name": "com.willhabencars.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2DfdNFod0EyuIKfORjylQ2d1pQc1VB8w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

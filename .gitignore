@@ -41,5 +41,4 @@ app-example
 # generated native folders
 /ios
 /android
-google-services.json
 fcm-service-account.json
