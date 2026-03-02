@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { scrapeWillhaben } from "./scraper.js";
+import { performance } from "node:perf_hooks";
 
 const app = express();
 const PORT = process.env.PORT || process.env.API_PORT || 8083;
@@ -19,6 +20,9 @@ let isFirstScrape = true;
 let isScraping = false;
 /** Ako scrape već traje, svi pozivi dobiju isti promise (nema overlap-a). */
 let currentScrapePromise = null;
+
+// Ovo koristimo samo za backoff logiku u loop-u (ne mijenja API ponašanje)
+let lastScrapeErrorMsg = null;
 
 // --- PUSH NOTIFICATIONS ---
 async function sendPushNotifications(newVehicles) {
@@ -62,7 +66,7 @@ async function sendPushNotifications(newVehicles) {
       body: JSON.stringify(messages),
     });
 
-    const resultText = await response.text(); // ✅ uzmi raw
+    const resultText = await response.text();
 
     let result;
     try {
@@ -71,7 +75,6 @@ async function sendPushNotifications(newVehicles) {
       return;
     }
 
-    // Expo odgovara sa data: [{status,id,message,details}]
     if (Array.isArray(result?.data)) {
       result.data.forEach((ticket, index) => {
         if (ticket?.status === "error") {
@@ -80,12 +83,9 @@ async function sendPushNotifications(newVehicles) {
           );
           console.log(`[Push] ERROR details:`, ticket.details || null);
 
-          // Clean up invalid tokens
           if (ticket.details?.error === "DeviceNotRegistered") {
             const badToken = messages[index]?.to;
-            if (badToken) {
-              pushTokens.delete(badToken);
-            }
+            if (badToken) pushTokens.delete(badToken);
           }
         }
       });
@@ -125,9 +125,11 @@ async function scrapeAndStore() {
   lastScrapeTime = new Date().toISOString();
   isFirstScrape = false;
 
+  // ✅ NE BLOKIRAJ SCRAPE LOOP NA PUSH (fire-and-forget)
   if (newlyFoundVehicles.length > 0) {
-    // Može biti sporije, ali je deterministično i bez overlap-a
-    await sendPushNotifications(newlyFoundVehicles);
+    sendPushNotifications(newlyFoundVehicles).catch((e) =>
+      console.error("[Push] async error:", e?.message || e),
+    );
   }
 
   return newlyFoundVehicles.length;
@@ -138,13 +140,15 @@ async function scrapeAndStoreSafe() {
   if (currentScrapePromise) return currentScrapePromise;
 
   currentScrapePromise = (async () => {
-    if (isScraping) return 0; // dodatni safety, realno neće doći ovdje
+    if (isScraping) return 0;
     isScraping = true;
 
     try {
+      lastScrapeErrorMsg = null;
       return await scrapeAndStore();
     } catch (e) {
-      console.error("Scrape error:", e?.message || e);
+      lastScrapeErrorMsg = e?.message || String(e);
+      console.error("Scrape error:", lastScrapeErrorMsg);
       return 0;
     } finally {
       isScraping = false;
@@ -167,8 +171,6 @@ app.post("/api/register-push-token", (req, res) => {
 });
 
 app.get("/api/vehicles", (req, res) => {
-  // Ovdje je O(n log n) sort; na ~1k elemenata je OK.
-  // Bitno: API endpoint ne smije čekati scrape – zato smo riješili overlap.
   const vehicles = Array.from(vehicleCache.values())
     .filter((v) => v.isPrivate === true)
     .sort((a, b) => new Date(b.firstSeenAt) - new Date(a.firstSeenAt))
@@ -195,7 +197,6 @@ app.post("/api/vehicles/mark-seen", (req, res) => {
 });
 
 app.post("/api/scrape", async (req, res) => {
-  // KRITIČNO: ne zovi scrapeAndStore() direktno – uvijek safe wrapper
   const newCount = await scrapeAndStoreSafe();
 
   res.json({
@@ -234,37 +235,69 @@ app.get("/", (req, res) => {
   });
 });
 
-function getNextScrapeDelay() {
+// --- LOOP DELAY: day = fast but not spam; night = your old schedule ---
+let dayBackoffMs = 0;
+
+function isNightNow() {
   const now = new Date();
   const h = now.getHours();
   const m = now.getMinutes();
+  return h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 50);
+}
 
-  const isNight = h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 50);
+function getNightDelayMs() {
+  return 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000; // 40–45min
+}
 
-  if (isNight) {
-    const interval = 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
-    console.log(
-      `[${now.toLocaleTimeString()}] Night scrape in ${Math.round(interval / 60000)} min`,
-    );
-    return interval;
+function getDayBaseDelayMs() {
+  return 1200 + Math.random() * 1000; // 250–450ms (brzo, ali ne ubija proxy pool)
+}
+
+function computeNextDelayMs(scrapeMs) {
+  if (isNightNow()) return getNightDelayMs();
+
+  // Heuristika problema:
+  // - error u scrape-u ili
+  // - “sporo” (često znači fallback / block / loš proxy)
+  const hadError = Boolean(lastScrapeErrorMsg);
+  const isSlow = scrapeMs >= 4500;
+  const hadIssue = hadError || isSlow;
+
+  if (hadIssue) {
+    // agresivnije uspori kad krene haos (sprečava 20s timeouts u seriji)
+    dayBackoffMs = Math.min(8000, Math.round(dayBackoffMs * 1.6 + 500));
+  } else {
+    // polako vraćaj na fast
+    dayBackoffMs = Math.max(0, Math.round(dayBackoffMs * 0.7 - 200));
   }
 
-  // Day: 2–4s (tvoj original)
-  const interval = 2000 + Math.random() * 2000;
-  console.log(
-    `[${now.toLocaleTimeString()}] Day scrape in ${Math.round(interval / 1000)}s`,
-  );
-  return interval;
+  return Math.round(getDayBaseDelayMs() + dayBackoffMs);
 }
 
-// --- START SERVER & SCRAPER LOOP ---
 function startScrapeLoop() {
   const tick = async () => {
-    await scrapeAndStoreSafe();
-    setTimeout(tick, getNextScrapeDelay());
+    const t0 = performance.now();
+
+    const newCount = await scrapeAndStoreSafe();
+    const scrapeMs = performance.now() - t0;
+
+    const delayMs = computeNextDelayMs(scrapeMs);
+    const now = new Date();
+
+    console.log(
+      `[${now.toLocaleTimeString()}] scrape=${Math.round(
+        scrapeMs,
+      )}ms new=${newCount} next_in=${(delayMs / 1000).toFixed(
+        1,
+      )}s cycle≈${((scrapeMs + delayMs) / 1000).toFixed(1)}s`,
+    );
+
+    setTimeout(tick, delayMs);
   };
+
   tick();
 }
+
 console.log(
   "[Boot] env PORT =",
   process.env.PORT,
@@ -273,12 +306,10 @@ console.log(
 );
 
 function startServer() {
-  // 1) Server odmah sluša (ne blokira se na scrape)
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Backend] API running on port ${PORT}`);
   });
 
-  // 2) Start scraping loop (prvi tick odmah)
   startScrapeLoop();
 }
 

@@ -5,9 +5,42 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import { getNextProxy } from "./proxy.js";
 import { fetchPageIPRoyal } from "./fetchPageIPRoyal.js";
 
-function fetchPage(url, baseUrl = null) {
+const HARD_TIMEOUT_MS = 12000;
+const REQ_TIMEOUT_MS = 8000;
+const MAX_REDIRECTS = 5;
+
+let webshareCooldownUntil = 0;
+const WEBSHARE_COOLDOWN_MS = 5 * 60_000;
+
+function inWebshareCooldown() {
+  return Date.now() < webshareCooldownUntil;
+}
+
+function startWebshareCooldown(reason) {
+  webshareCooldownUntil = Date.now() + WEBSHARE_COOLDOWN_MS;
+  console.warn(
+    `⚠️ Webshare issue (${reason}) → cooldown ${Math.round(
+      WEBSHARE_COOLDOWN_MS / 1000,
+    )}s → switching to IPRoyal`,
+  );
+}
+
+function looksBlocked(html) {
+  if (!html) return true;
+  const s = html.toLowerCase();
+  return (
+    !s.includes("__next_data__") ||
+    s.includes("captcha") ||
+    s.includes("access denied") ||
+    s.includes("cloudflare") ||
+    s.includes("bot")
+  );
+}
+
+function fetchPage(url, baseUrl = null, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     let fullUrl = url;
+
     if (!url.startsWith("http") && baseUrl) {
       const base = new URL(baseUrl);
       fullUrl = url.startsWith("/")
@@ -15,10 +48,27 @@ function fetchPage(url, baseUrl = null) {
         : `${baseUrl}/${url}`;
     }
 
-    const parsedUrl = new URL(fullUrl);
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(fullUrl);
+    } catch (e) {
+      return reject(new Error(`Bad URL: ${fullUrl}`));
+    }
+
+    if (redirectCount > MAX_REDIRECTS) {
+      return reject(new Error(`Too many redirects (${MAX_REDIRECTS})`));
+    }
 
     const proxyString = getNextProxy();
+    if (!proxyString || typeof proxyString !== "string") {
+      return reject(new Error("Proxy string is empty/invalid"));
+    }
+
     const [ip, port, user, pass] = proxyString.split(":");
+    if (!ip || !port || !user || !pass) {
+      return reject(new Error("Proxy string format must be ip:port:user:pass"));
+    }
+
     const proxyUrl = `http://${user}:${pass}@${ip}:${port}`;
 
     const agent =
@@ -45,7 +95,6 @@ function fetchPage(url, baseUrl = null) {
     let finished = false;
     let req;
 
-    const HARD_TIMEOUT_MS = 20000;
     const hardTimer = setTimeout(() => {
       if (finished) return;
       finished = true;
@@ -74,7 +123,9 @@ function fetchPage(url, baseUrl = null) {
       if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
         const next = res.headers.location;
         res.resume();
-        fetchPage(next, fullUrl).then(doneResolve).catch(doneReject);
+        fetchPage(next, fullUrl, redirectCount + 1)
+          .then(doneResolve)
+          .catch(doneReject);
         return;
       }
 
@@ -85,16 +136,17 @@ function fetchPage(url, baseUrl = null) {
         return;
       }
 
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => doneResolve(data));
+      // ✅ brže i stabilnije od data += chunk
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => doneResolve(Buffer.concat(chunks).toString("utf8")));
       res.on("aborted", () => doneReject(new Error("Response aborted")));
       res.on("error", doneReject);
     });
 
     // inactivity timeout
-    req.setTimeout(15000, () => {
-      req.destroy(new Error("Request timeout after 15000ms"));
+    req.setTimeout(REQ_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Request timeout after ${REQ_TIMEOUT_MS}ms`));
     });
 
     req.on("error", doneReject);
@@ -130,6 +182,7 @@ function extractPhoneNumber(text) {
 
   return null;
 }
+
 function parseVehiclesFromHTML(html) {
   const vehicles = [];
 
@@ -167,7 +220,6 @@ function parseVehiclesFromHTML(html) {
     const linkMatch = articleHtml.match(/href="(\/iad\/[^"]+)"/);
     const willhabenPath = linkMatch ? linkMatch[1] : null;
 
-    // ukloni query string da ID bude stabilan
     const cleanPath = willhabenPath ? willhabenPath.split("?")[0] : null;
 
     const willhabenUrl = cleanPath
@@ -233,9 +285,7 @@ function parseVehiclesFromJSON(html) {
 
       const isPrivate = isPrivateAd(attrs);
 
-      if (!isPrivate) {
-        continue; // preskoči oglas firme
-      }
+      if (!isPrivate) continue;
 
       const getAttr = (name) =>
         attrs.find((a) => a.name === name)?.values?.[0] || null;
@@ -285,37 +335,60 @@ function parseVehiclesFromJSON(html) {
   return vehicles;
 }
 
+function filterVehicles(vehicles) {
+  return vehicles.filter(
+    (v) => v.isPrivate === true && (!v.price || v.price <= 10000),
+  );
+}
+
 export async function scrapeWillhaben() {
   const url =
     "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?rows=30&PRICE_TO=10000&DEALER=1";
 
   try {
-    let html = await fetchPage(url);
+    let html = "";
+    let vehicles = [];
 
-    let vehicles = parseVehiclesFromJSON(html);
-
-    if (vehicles.length === 0) {
-      vehicles = parseVehiclesFromHTML(html);
-    }
-
-    if (vehicles.length === 0) {
-      console.warn("⚠️ Webshare fail → switching to IPRoyal");
+    // 1) Ako je Webshare u cooldown-u, idi direktno IPRoyal (štedi dupli fetch)
+    if (inWebshareCooldown()) {
       html = await fetchPageIPRoyal(url);
-
       vehicles = parseVehiclesFromJSON(html);
-
-      if (vehicles.length === 0) {
-        vehicles = parseVehiclesFromHTML(html);
-      }
+      if (vehicles.length === 0) vehicles = parseVehiclesFromHTML(html);
+      return filterVehicles(vehicles);
     }
 
-    const filtered = vehicles.filter(
-      (v) => v.isPrivate === true && (!v.price || v.price <= 10000),
-    );
+    // 2) Webshare pokušaj
+    html = await fetchPage(url);
 
-    return filtered;
+    const blocked = looksBlocked(html);
+    vehicles = parseVehiclesFromJSON(html);
+    if (vehicles.length === 0) vehicles = parseVehiclesFromHTML(html);
+
+    // 3) Fallback ako je blokirano ili prazno
+    if (blocked || vehicles.length === 0) {
+      startWebshareCooldown(blocked ? "blocked" : "empty");
+
+      html = await fetchPageIPRoyal(url);
+      vehicles = parseVehiclesFromJSON(html);
+      if (vehicles.length === 0) vehicles = parseVehiclesFromHTML(html);
+    } else {
+      // uspjeh: reset cooldown
+      webshareCooldownUntil = 0;
+    }
+
+    return filterVehicles(vehicles);
   } catch (err) {
-    console.error("❌ Scrape error:", err.message);
-    return [];
+    console.error("❌ Scrape error:", err?.message || err);
+
+    // fail-safe: probaj IPRoyal jednom (bolje nego vratiti [] bez pokušaja)
+    try {
+      const html = await fetchPageIPRoyal(url);
+      let vehicles = parseVehiclesFromJSON(html);
+      if (vehicles.length === 0) vehicles = parseVehiclesFromHTML(html);
+      return filterVehicles(vehicles);
+    } catch (e2) {
+      console.error("❌ IPRoyal error:", e2?.message || e2);
+      return [];
+    }
   }
 }
