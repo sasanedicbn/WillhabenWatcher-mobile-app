@@ -13,6 +13,7 @@
       "bundleIdentifier": "com.willhabencars.app"
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#1E40AF",
         "foregroundImage": "./assets/images/icon.png"

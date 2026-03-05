@@ -16,13 +16,9 @@ const pushTokens = new Set();
 let lastScrapeTime = null;
 let isFirstScrape = true;
 
-// --- SCRAPE LOCK (kritično) ---
+// --- SCRAPE LOCK ---
 let isScraping = false;
-/** Ako scrape već traje, svi pozivi dobiju isti promise (nema overlap-a). */
 let currentScrapePromise = null;
-
-// Ovo koristimo samo za backoff logiku u loop-u (ne mijenja API ponašanje)
-let lastScrapeErrorMsg = null;
 
 // --- PUSH NOTIFICATIONS ---
 async function sendPushNotifications(newVehicles) {
@@ -53,10 +49,7 @@ async function sendPushNotifications(newVehicles) {
   }
 
   try {
-    console.log(`[Push] tokens=${pushTokens.size} messages=${messages.length}`);
-    console.log(`[Push] sample to= ${messages[0]?.to}`);
-
-    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+    await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -65,38 +58,8 @@ async function sendPushNotifications(newVehicles) {
       },
       body: JSON.stringify(messages),
     });
-
-    const resultText = await response.text();
-
-    let result;
-    try {
-      result = JSON.parse(resultText);
-    } catch {
-      return;
-    }
-
-    if (Array.isArray(result?.data)) {
-      result.data.forEach((ticket, index) => {
-        if (ticket?.status === "error") {
-          console.log(
-            `[Push] ERROR ticket message: ${ticket.message || "unknown"}`,
-          );
-          console.log(`[Push] ERROR details:`, ticket.details || null);
-
-          if (ticket.details?.error === "DeviceNotRegistered") {
-            const badToken = messages[index]?.to;
-            if (badToken) pushTokens.delete(badToken);
-          }
-        }
-      });
-    } else {
-      console.log("[Push] Unexpected Expo response shape:", result);
-    }
   } catch (error) {
-    console.error(
-      "[Push] Failed to send notifications:",
-      error?.message || error,
-    );
+    console.error("[Push] Failed:", error?.message || error);
   }
 }
 
@@ -125,7 +88,7 @@ async function scrapeAndStore() {
   lastScrapeTime = new Date().toISOString();
   isFirstScrape = false;
 
-  // ✅ NE BLOKIRAJ SCRAPE LOOP NA PUSH (fire-and-forget)
+  // ✅ push NE BLOKIRA loop
   if (newlyFoundVehicles.length > 0) {
     sendPushNotifications(newlyFoundVehicles).catch((e) =>
       console.error("[Push] async error:", e?.message || e),
@@ -135,7 +98,6 @@ async function scrapeAndStore() {
   return newlyFoundVehicles.length;
 }
 
-/** Safe wrapper: nema paralelnih scrape-ova. */
 async function scrapeAndStoreSafe() {
   if (currentScrapePromise) return currentScrapePromise;
 
@@ -144,11 +106,9 @@ async function scrapeAndStoreSafe() {
     isScraping = true;
 
     try {
-      lastScrapeErrorMsg = null;
       return await scrapeAndStore();
     } catch (e) {
-      lastScrapeErrorMsg = e?.message || String(e);
-      console.error("Scrape error:", lastScrapeErrorMsg);
+      console.error("Scrape error:", e?.message || e);
       return 0;
     } finally {
       isScraping = false;
@@ -166,7 +126,6 @@ app.post("/api/register-push-token", (req, res) => {
     return res.status(400).json({ error: "Invalid token" });
   }
   pushTokens.add(token);
-  console.log(`[Push] Token registered. Total: ${pushTokens.size}`);
   res.json({ success: true });
 });
 
@@ -235,43 +194,18 @@ app.get("/", (req, res) => {
   });
 });
 
-// --- LOOP DELAY: day = fast but not spam; night = your old schedule ---
-let dayBackoffMs = 0;
-
-function isNightNow() {
+// --- DELAY (brz) ---
+function getNextScrapeDelayMs() {
   const now = new Date();
   const h = now.getHours();
   const m = now.getMinutes();
-  return h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 50);
-}
 
-function getNightDelayMs() {
-  return 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000; // 40–45min
-}
-
-function getDayBaseDelayMs() {
-  return 1200 + Math.random() * 1000; // 250–450ms (brzo, ali ne ubija proxy pool)
-}
-
-function computeNextDelayMs(scrapeMs) {
-  if (isNightNow()) return getNightDelayMs();
-
-  // Heuristika problema:
-  // - error u scrape-u ili
-  // - “sporo” (često znači fallback / block / loš proxy)
-  const hadError = Boolean(lastScrapeErrorMsg);
-  const isSlow = scrapeMs >= 4500;
-  const hadIssue = hadError || isSlow;
-
-  if (hadIssue) {
-    // agresivnije uspori kad krene haos (sprečava 20s timeouts u seriji)
-    dayBackoffMs = Math.min(8000, Math.round(dayBackoffMs * 1.6 + 500));
-  } else {
-    // polako vraćaj na fast
-    dayBackoffMs = Math.max(0, Math.round(dayBackoffMs * 0.7 - 200));
+  const isNight = h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 50);
+  if (isNight) {
+    return 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
   }
 
-  return Math.round(getDayBaseDelayMs() + dayBackoffMs);
+  return 800 + Math.random() * 600; // 0.8–1.4s
 }
 
 function startScrapeLoop() {
@@ -281,7 +215,7 @@ function startScrapeLoop() {
     const newCount = await scrapeAndStoreSafe();
     const scrapeMs = performance.now() - t0;
 
-    const delayMs = computeNextDelayMs(scrapeMs);
+    const delayMs = getNextScrapeDelayMs();
     const now = new Date();
 
     console.log(
@@ -305,12 +239,8 @@ console.log(
   process.env.API_PORT,
 );
 
-function startServer() {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Backend] API running on port ${PORT}`);
-  });
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[Backend] API running on port ${PORT}`);
+});
 
-  startScrapeLoop();
-}
-
-startServer();
+startScrapeLoop();

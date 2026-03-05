@@ -34,7 +34,6 @@ const NotificationContext = createContext<NotificationContextType | undefined>(
 
 async function registerForPushNotificationsAsync(): Promise<string | null> {
   if (Platform.OS === "web") {
-    console.log("Push notifications skipped on web");
     return null;
   }
 
@@ -61,7 +60,6 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
     }
 
     if (finalStatus !== "granted") {
-      console.log("Permission not granted for push notifications");
       return null;
     }
 
@@ -71,7 +69,6 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
         Constants.easConfig?.projectId;
 
       if (!projectId) {
-        console.log("❌ EAS projectId missing");
         return null;
       }
 
