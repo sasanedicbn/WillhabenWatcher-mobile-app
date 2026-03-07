@@ -194,24 +194,25 @@ app.get("/", (req, res) => {
   });
 });
 
-// --- DELAY (brz) ---
+// --- DELAY ---
 function getNextScrapeDelayMs() {
   const now = new Date();
   const h = now.getHours();
   const m = now.getMinutes();
 
   const isNight = h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 50);
+
   if (isNight) {
     return 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
   }
 
-  return 800 + Math.random() * 600; // 0.8–1.4s
+  // Dan: brzo, ali ne preagresivno (0.8–1.4s)
+  return 800 + Math.random() * 600;
 }
 
 function startScrapeLoop() {
   const tick = async () => {
     const t0 = performance.now();
-
     const newCount = await scrapeAndStoreSafe();
     const scrapeMs = performance.now() - t0;
 

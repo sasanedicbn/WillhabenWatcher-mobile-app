@@ -5,27 +5,53 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import { getNextProxy } from "./proxy.js";
 import { fetchPageIPRoyal } from "./fetchPageIPRoyal.js";
 
-// Webshare: zadrži “može do 20s” kako si tražila
-const WEBSHARE_HARD_TIMEOUT_MS = 9000;
-const WEBSHARE_REQ_TIMEOUT_MS = 8000;
+// =====================
+// WORST-CASE (hard cap)
+// =====================
+const SCRAPE_BUDGET_MS = 9200; // ✅ maksimalno čekanje po scrape pozivu
 
-// Ako Webshare ne da HEADER brzo -> odmah parallel fallback
+// Webshare timeouts (kraći da ne “jede” budžet)
 const WEBSHARE_FIRST_BYTE_MS = 1500;
+const WEBSHARE_REQ_TIMEOUT_MS = 6000;
+const WEBSHARE_HARD_TIMEOUT_MS = 6500;
 
-// IPRoyal: može do 20s (kako si tražila)
-const IPROYAL_TIMEOUT_MS = 10000;
+// IPRoyal cap (da zajedno sa hedge delay ne pređe budget)
+const IPROYAL_HEDGE_DELAY_MS = 2000;
+const IPROYAL_TIMEOUT_MS = 7000;
+
+// (Opcionalno) retry Webshare sa drugim proxyjem ako baš kasni
+const WEBSHARE_RETRY_DELAY_MS = 3000;
 
 const MAX_REDIRECTS = 5;
 
-function withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms),
-    ),
-  ]);
+// lastGood: da ne “nestane lista” kad je loš network/proxy momenat
+let lastGoodVehicles = [];
+let lastGoodAt = 0;
+const LAST_GOOD_TTL_MS = 15 * 60 * 1000;
+
+function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error(`${label} timeout after ${ms}ms`)),
+      ms,
+    );
+    promise
+      .then((v) => {
+        clearTimeout(t);
+        resolve(v);
+      })
+      .catch((e) => {
+        clearTimeout(t);
+        reject(e);
+      });
+  });
+}
+
+// Block detekcija: samo “tvrdi” signali (ne __NEXT_DATA__)
 function looksBlocked(html) {
   if (!html) return true;
   const s = html.toLowerCase();
@@ -35,17 +61,6 @@ function looksBlocked(html) {
     s.includes("forbidden") ||
     s.includes("cloudflare") ||
     s.includes("verify you are human")
-  );
-}
-
-function isWebshareFastFail(errMsg) {
-  const m = (errMsg || "").toLowerCase();
-  return (
-    m.includes("first byte timeout") ||
-    m.includes("request timeout") ||
-    m.includes("hard timeout") ||
-    m.includes("aborted") ||
-    m.includes("terminated")
   );
 }
 
@@ -142,7 +157,7 @@ function fetchPageWebshare(url, baseUrl = null, redirectCount = 0) {
         return;
       }
 
-      // 4xx/5xx tretiramo kao prazno -> gore će odmah preći na IPRoyal
+      // 4xx/5xx -> prazno
       if (res.statusCode && res.statusCode >= 400) {
         res.resume();
         doneResolve("");
@@ -156,7 +171,6 @@ function fetchPageWebshare(url, baseUrl = null, redirectCount = 0) {
       res.on("error", doneReject);
     });
 
-    // FIRST BYTE timeout
     firstByteTimer = setTimeout(() => {
       try {
         req?.destroy(
@@ -178,7 +192,7 @@ function fetchPageWebshare(url, baseUrl = null, redirectCount = 0) {
   });
 }
 
-// ===== parsing (netaknuto) =====
+// ===== parsing (tvoja logika) =====
 function extractPrice(text) {
   if (!text) return null;
   const match = text.replace(/[^\d]/g, "");
@@ -361,81 +375,78 @@ function filterVehicles(vehicles) {
 }
 
 function parseAny(html) {
-  let vehicles = parseVehiclesFromJSON(html);
+  let vehicles = [];
+  if (html && html.includes("__NEXT_DATA__")) {
+    vehicles = parseVehiclesFromJSON(html);
+  }
   if (vehicles.length === 0) vehicles = parseVehiclesFromHTML(html);
   return { vehicles, blocked: looksBlocked(html) };
 }
 
-// ===== MAIN =====
+// =====================
+// MAIN (hard <= 9.0s)
+// =====================
 export async function scrapeWillhaben() {
   const url =
     "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?rows=30&PRICE_TO=10000&DEALER=1";
 
-  // Helper za IPRoyal (sa timeoutom)
-  const ipPromise = () =>
-    withTimeout(fetchPageIPRoyal(url), IPROYAL_TIMEOUT_MS, "IPRoyal");
+  const startedAt = Date.now();
 
-  // 1) pokušaj Webshare
+  const budgetPromise = new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error("SCRAPE_BUDGET_EXCEEDED")),
+      SCRAPE_BUDGET_MS,
+    ),
+  );
+
+  const attempt = async (label, htmlPromise) => {
+    const html = await htmlPromise;
+    const p = parseAny(html);
+    const v = filterVehicles(p.vehicles);
+    if (!p.blocked && v.length > 0) return v;
+    throw new Error(`${label}: blocked/empty`);
+  };
+
+  // Webshare odmah
+  const web1 = attempt("web1", fetchPageWebshare(url));
+
+  // IPRoyal hedged (krene tek nakon 2s)
+  const ip = (async () => {
+    await delay(IPROYAL_HEDGE_DELAY_MS);
+    return await attempt(
+      "ip",
+      withTimeout(fetchPageIPRoyal(url), IPROYAL_TIMEOUT_MS, "IPRoyal"),
+    );
+  })();
+
+  // Webshare retry (drugi proxy) nakon 3s
+  const web2 = (async () => {
+    await delay(WEBSHARE_RETRY_DELAY_MS);
+    return await attempt("web2", fetchPageWebshare(url));
+  })();
+
   try {
-    const htmlWeb = await fetchPageWebshare(url);
-    const p = parseAny(htmlWeb);
+    const winner = await Promise.race([
+      Promise.any([web1, ip, web2]),
+      budgetPromise,
+    ]);
 
-    // Webshare ok
-    if (!p.blocked && p.vehicles.length > 0) {
-      return filterVehicles(p.vehicles);
-    }
-
-    // Webshare blok/prazno -> odmah IPRoyal
-    const htmlIp = await ipPromise();
-    const p2 = parseAny(htmlIp);
-    return filterVehicles(p2.vehicles);
+    // success
+    lastGoodVehicles = winner;
+    lastGoodAt = Date.now();
+    return winner;
   } catch (e) {
-    const msg = e?.message || String(e);
-
-    // 2) Ako Webshare fast-fail (first-byte/timeout/aborted) -> uradi:
-    //    IPRoyal + Webshare retry paralelno, uzmi šta dođe prvo (smanjuje 14s tail)
-    if (isWebshareFastFail(msg)) {
-      const retryWeb = fetchPageWebshare(url).catch(() => null);
-      const ip = ipPromise().catch(() => null);
-
-      // čekaj prvi koji da html (ne preskačemo ciklus)
-      const first = await Promise.any([
-        retryWeb.then((h) => {
-          if (!h) throw new Error("retry web failed");
-          return { src: "web", html: h };
-        }),
-        ip.then((h) => {
-          if (!h) throw new Error("ip failed");
-          return { src: "ip", html: h };
-        }),
-      ]).catch(() => null);
-
-      if (first?.html) {
-        const p = parseAny(first.html);
-        if (!p.blocked && p.vehicles.length > 0) {
-          return filterVehicles(p.vehicles);
-        }
-        // ako prvi vrati block/empty, čekaj drugog
-        const secondHtml = first.src === "web" ? await ip : await retryWeb;
-
-        if (secondHtml) {
-          const p2 = parseAny(secondHtml);
-          return filterVehicles(p2.vehicles);
-        }
-      }
-
-      console.error("❌ Both proxies failed: terminated");
-      return [];
+    // hard cap – vraćamo lastGood da korisnik ne dobije “prazan ekran”
+    const age = Date.now() - lastGoodAt;
+    if (lastGoodVehicles.length > 0 && age <= LAST_GOOD_TTL_MS) {
+      return lastGoodVehicles;
     }
 
-    // 3) ostali webshare errori -> fallback na IPRoyal
-    try {
-      const htmlIp = await ipPromise();
-      const p2 = parseAny(htmlIp);
-      return filterVehicles(p2.vehicles);
-    } catch (e2) {
-      console.error("❌ Both proxies failed:", e2?.message || e2);
-      return [];
-    }
+    // Ako smo na startu i nemamo lastGood, nema šta – vrati []
+    // (ovo se obično desi samo dok prvi put ne uhvatiš rezultate)
+    return [];
+  } finally {
+    // samo da ne ostaviš unused var (debug)
+    void startedAt;
   }
 }
