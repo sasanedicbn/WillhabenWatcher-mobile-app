@@ -16,7 +16,6 @@ const pushTokens = new Set();
 let lastScrapeTime = null;
 let isFirstScrape = true;
 
-// --- SCRAPE LOCK ---
 let isScraping = false;
 let currentScrapePromise = null;
 
@@ -88,7 +87,6 @@ async function scrapeAndStore() {
   lastScrapeTime = new Date().toISOString();
   isFirstScrape = false;
 
-  // ✅ push NE BLOKIRA loop
   if (newlyFoundVehicles.length > 0) {
     sendPushNotifications(newlyFoundVehicles).catch((e) =>
       console.error("[Push] async error:", e?.message || e),
@@ -157,7 +155,6 @@ app.post("/api/vehicles/mark-seen", (req, res) => {
 
 app.post("/api/scrape", async (req, res) => {
   const newCount = await scrapeAndStoreSafe();
-
   res.json({
     success: true,
     newCount,
@@ -194,20 +191,24 @@ app.get("/", (req, res) => {
   });
 });
 
-// --- DELAY ---
+// --- RISKY DAY DELAY: skoro bez delay-a ---
 function getNextScrapeDelayMs() {
   const now = new Date();
   const h = now.getHours();
   const m = now.getMinutes();
 
   const isNight = h === 23 || (h >= 0 && h < 5) || (h === 5 && m < 50);
-
   if (isNight) {
     return 40 * 60 * 1000 + Math.random() * 5 * 60 * 1000;
   }
 
-  // Dan: brzo, ali ne preagresivno (0.8–1.4s)
-  return 800 + Math.random() * 600;
+  // Dan: 0.05–0.20s (rizično)
+  return 50 + Math.random() * 150;
+}
+
+function scheduleNext(fn, delayMs) {
+  if (delayMs <= 0) setImmediate(fn);
+  else setTimeout(fn, delayMs);
 }
 
 function startScrapeLoop() {
@@ -227,7 +228,7 @@ function startScrapeLoop() {
       )}s cycle≈${((scrapeMs + delayMs) / 1000).toFixed(1)}s`,
     );
 
-    setTimeout(tick, delayMs);
+    scheduleNext(tick, delayMs);
   };
 
   tick();
