@@ -203,7 +203,7 @@ function getNextScrapeDelayMs() {
   }
 
   // Dan: 0.05–0.20s (rizično)
-  return 50 + Math.random() * 150;
+  return 200 + Math.random() * 200;
 }
 
 function scheduleNext(fn, delayMs) {
