@@ -482,90 +482,42 @@ function parseAny(html) {
 // lastGood (da UI ne "prazni" kad naleti loš momenat)
 let lastGoodFiltered = [];
 let lastGoodAt2 = 0;
+const LAST_GOOD_TTL_MS = 15 * 60 * 1000;
 
 // =====================
-// MAIN
+// MAIN (IPROYAL ONLY)
 // =====================
 export async function scrapeWillhaben() {
   const url =
     "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?rows=30&PRICE_TO=10000&DEALER=1";
 
-  const deadline = Date.now() + SCRAPE_BUDGET_MS;
+  const startedAt = Date.now();
+  const deadline = startedAt + SCRAPE_BUDGET_MS;
   const timeLeft = () => Math.max(1, deadline - Date.now());
 
-  // 1) Webshare pokušaj (sticky proxy)
-  let slowTimerFired = false;
-  let startIP = null;
-
-  const slowTimer = setTimeout(() => {
-    slowTimerFired = true;
-    startIP?.();
-  }, IPROYAL_SLOW_START_MS);
-
-  let ipPromise = null;
-  const startIPRoyal = () => {
-    if (ipPromise) return;
-    const wait = Math.min(IPROYAL_MAX_WAIT_MS, timeLeft());
-    ipPromise = withTimeout(fetchPageIPRoyal(url), wait, "IPRoyal");
-  };
-  startIP = startIPRoyal;
-
   try {
-    const { html, proxyString } = await withTimeout(
-      fetchPageWebshare(url),
-      timeLeft(),
-      "WEB_BUDGET",
-    );
-
-    clearTimeout(slowTimer);
-
+    // ✅ 1) PRVI POKUŠAJ: samo IPRoyal
+    const html = await fetchPageIPRoyal(url); // fetchPageIPRoyal već ima AbortController (15s u tvom fajlu)
     const p = parseAny(html);
     const filtered = filterVehicles(p.vehicles);
 
     if (!p.blocked) {
-      // uspeh: drži sticky
       lastGoodFiltered = filtered;
       lastGoodAt2 = Date.now();
       return filtered;
     }
 
-    // block: ovaj proxy pauziraj kratko i probaj jednom rotate Webshare
-    markProxyBad(proxyString, BLOCKED_PROXY_COOLDOWN_MS);
+    // ✅ 2) RETRY 1x (ako ima vremena u budžetu)
+    if (timeLeft() > 1200) {
+      await delay(150);
+      const html2 = await fetchPageIPRoyal(url);
+      const p2 = parseAny(html2);
+      const filtered2 = filterVehicles(p2.vehicles);
 
-    const remaining = timeLeft();
-    if (remaining > 1200) {
-      const { html: html2, proxyString: p2 } = await withTimeout(
-        fetchPageWebshare(
-          url,
-          null,
-          0,
-          pickWebshareProxy({ forceRotate: true }),
-        ),
-        remaining,
-        "WEB_RETRY",
-      );
-      const pp = parseAny(html2);
-      const f2 = filterVehicles(pp.vehicles);
-      if (!pp.blocked) {
-        lastGoodFiltered = f2;
+      if (!p2.blocked) {
+        lastGoodFiltered = filtered2;
         lastGoodAt2 = Date.now();
-        return f2;
-      }
-      markProxyBad(p2, BLOCKED_PROXY_COOLDOWN_MS);
-    }
-
-    // Ako smo blockovani i dalje: tek sad IP (rijetko)
-    startIPRoyal();
-    if (ipPromise) {
-      const htmlIp = await ipPromise.catch(() => null);
-      if (htmlIp) {
-        const pi = parseAny(htmlIp);
-        const fi = filterVehicles(pi.vehicles);
-        if (!pi.blocked) {
-          lastGoodFiltered = fi;
-          lastGoodAt2 = Date.now();
-          return fi;
-        }
+        return filtered2;
       }
     }
 
@@ -576,69 +528,18 @@ export async function scrapeWillhaben() {
     ) {
       return lastGoodFiltered;
     }
+
     return [];
-  } catch ({ err, proxyString }) {
-    clearTimeout(slowTimer);
+  } catch (e) {
+    console.error("❌ IPRoyal scrape error:", e?.message || e);
 
-    const msg = err?.message || String(err || "");
-
-    // mrežni fail -> proxy je mrtav, cooldown
-    if (proxyString && isNetworkFail(msg)) {
-      markProxyBad(proxyString, DEAD_PROXY_COOLDOWN_MS);
-    }
-
-    // 2) Brzi Webshare retry sa novim proxyjem (IPRoyal još ne zovemo)
-    const remaining = timeLeft();
-    if (remaining > 1500) {
-      try {
-        const forced = pickWebshareProxy({ forceRotate: true });
-        const { html: html2, proxyString: p2 } = await withTimeout(
-          fetchPageWebshare(url, null, 0, forced),
-          remaining,
-          "WEB_RETRY",
-        );
-
-        const pp = parseAny(html2);
-        const f2 = filterVehicles(pp.vehicles);
-
-        if (!pp.blocked) {
-          lastGoodFiltered = f2;
-          lastGoodAt2 = Date.now();
-          return f2;
-        }
-
-        markProxyBad(p2, BLOCKED_PROXY_COOLDOWN_MS);
-      } catch (e2) {
-        const m2 = e2?.err?.message || e2?.message || String(e2 || "");
-        if (e2?.proxyString && isNetworkFail(m2)) {
-          markProxyBad(e2.proxyString, DEAD_PROXY_COOLDOWN_MS);
-        }
-      }
-    }
-
-    // 3) IPRoyal samo ako mora (Webshare pukao)
-    startIPRoyal();
-    if (ipPromise) {
-      const htmlIp = await ipPromise.catch(() => null);
-      if (htmlIp) {
-        const pi = parseAny(htmlIp);
-        const fi = filterVehicles(pi.vehicles);
-        if (!pi.blocked) {
-          lastGoodFiltered = fi;
-          lastGoodAt2 = Date.now();
-          return fi;
-        }
-      }
-    }
-
-    // lastGood fallback
+    // fallback lastGood
     if (
       lastGoodFiltered.length > 0 &&
       Date.now() - lastGoodAt2 <= LAST_GOOD_TTL_MS
     ) {
       return lastGoodFiltered;
     }
-
     return [];
   }
 }

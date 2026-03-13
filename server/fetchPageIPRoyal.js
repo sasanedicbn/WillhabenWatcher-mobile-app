@@ -1,17 +1,29 @@
 import "dotenv/config";
 import { ProxyAgent, fetch } from "undici";
 
-export async function fetchPageIPRoyal(url) {
+let cachedAgent = null;
+let cachedProxyUrl = null;
+
+function getAgent() {
   const proxyUrl = `http://${process.env.IPROYAL_USER}:${process.env.IPROYAL_PASS}@${process.env.IPROYAL_HOST}:${process.env.IPROYAL_PORT}`;
 
   if (proxyUrl.includes("undefined")) {
     throw new Error("IPRoyal ENV variables are missing");
   }
 
-  const agent = new ProxyAgent(proxyUrl);
+  if (!cachedAgent || cachedProxyUrl !== proxyUrl) {
+    cachedProxyUrl = proxyUrl;
+    cachedAgent = new ProxyAgent(proxyUrl);
+  }
+
+  return cachedAgent;
+}
+
+export async function fetchPageIPRoyal(url, timeoutMs = 9000) {
+  const agent = getAgent();
 
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 15000);
+  const t = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(url, {
@@ -26,10 +38,7 @@ export async function fetchPageIPRoyal(url) {
       },
     });
 
-    if (!res.ok) {
-      throw new Error(`IPRoyal status ${res.status}`);
-    }
-
+    if (!res.ok) throw new Error(`IPRoyal status ${res.status}`);
     return await res.text();
   } finally {
     clearTimeout(t);
